@@ -25,6 +25,13 @@ class Evaluator:
     self.config = config
     self.tokenizer = tokenizer
     self.maxk = max(config['topk'])
+    self.candidate_multiplier = config.get(
+        'domain_filter_candidate_multiplier', 4
+    )
+
+  @property
+  def max_candidates(self):
+    return self.maxk * self.candidate_multiplier
 
   @property
   def eos_token(self):
@@ -77,6 +84,28 @@ class Evaluator:
 
     return preds[:, :self.maxk, 0] == -1
 
+  def filter_preds_by_source(self, preds, source_id):
+    preds = preds.detach().cpu()
+    source_id = source_id.detach().cpu()
+    filtered = torch.full(
+        (preds.shape[0], self.maxk, preds.shape[-1]),
+        -1,
+        dtype=preds.dtype,
+    )
+    for i in range(preds.shape[0]):
+      allowed_labels = self.tokenizer.source_allowed_labels[source_id[i].item()]
+      seen = set()
+      out_idx = 0
+      for pred in preds[i].tolist():
+        pred_key = tuple(pred)
+        if pred_key in allowed_labels and pred_key not in seen:
+          filtered[i, out_idx] = torch.LongTensor(pred)
+          seen.add(pred_key)
+          out_idx += 1
+          if out_idx == self.maxk:
+            break
+    return filtered
+
   def err_at_k(self, err_index, k):
     """Calculate the percentage of illegal predictions among the top k generated token sequences.
 
@@ -90,7 +119,7 @@ class Evaluator:
     """
     return err_index[:, :k].float().mean(dim=1).cpu()
 
-  def calculate_metrics(self, preds, labels):
+  def calculate_metrics(self, preds, labels, source_id=None):
     """Calculate the evaluation metrics.
 
     Args:
@@ -108,10 +137,20 @@ class Evaluator:
         'err': self.err_at_k,
     }
     results = {}
+    if source_id is not None:
+      preds = self.filter_preds_by_source(preds, source_id)
     pos_index = self.calculate_pos_index(preds, labels)
     err_index = self.calculate_err_index(preds)
     for metric in self.config['metrics']:
       index = err_index if metric == 'err' else pos_index
       for k in self.config['topk']:
-        results[f'{metric}@{k}'] = metric2func[metric](index, k)
+        key = f'{metric}@{k}'
+        values = metric2func[metric](index, k)
+        results[key] = values
+        if source_id is not None:
+          source_id_cpu = source_id.detach().cpu()
+          for sid, source in enumerate(self.tokenizer.id2source):
+            mask = source_id_cpu == sid
+            if mask.any():
+              results[f'{source}/{key}'] = values[mask]
     return results

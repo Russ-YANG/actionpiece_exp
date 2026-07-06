@@ -70,6 +70,20 @@ def check_available_category(category: str):
   )
 
 
+def normalize_categories(category: str | Sequence[str]) -> list[str]:
+  """Normalize category config to a list of category names."""
+  if isinstance(category, str):
+    categories = [c.strip() for c in category.split(',')]
+  else:
+    categories = list(category)
+  categories = [c for c in categories if c]
+  if not categories:
+    raise ValueError('At least one category must be specified.')
+  for c in categories:
+    check_available_category(c)
+  return categories
+
+
 def parse_gz(path: str):
   """Parse a gzipped file and yield each line as a dict.
 
@@ -144,8 +158,10 @@ class AmazonReviews2014(AbstractDataset):
     """
     super().__init__(config)
 
-    self.category = config['category']
-    check_available_category(self.category)
+    self.categories = normalize_categories(config['category'])
+    self.category = '+'.join(self.categories)
+    if len(self.categories) > 1:
+      self.category = f'{self.category}_separate_splits'
     self.log(f'[DATASET] Amazon Reviews 2014 for category: {self.category}')
 
     self.cache_dir = os.path.join(
@@ -153,11 +169,14 @@ class AmazonReviews2014(AbstractDataset):
     )
     self._download_and_process_raw()
 
-  def _download_raw(self, path: str, file_type: str = 'reviews') -> str:
+  def _download_raw(
+      self, path: str, category: str, file_type: str = 'reviews'
+  ) -> str:
     """Downloads the raw data file from the specified URL and saves it locally.
 
     Args:
         path (str): The path to the directory where the file will be saved.
+        category (str): The category to download.
         file_type (str, optional): The type of data to download. Defaults to
           'reviews'.
 
@@ -165,7 +184,7 @@ class AmazonReviews2014(AbstractDataset):
         str: The local file path where the downloaded file is saved.
     """
     url = (
-        f'https://snap.stanford.edu/data/amazon/productGraph/categoryFiles/{file_type}_{self.category}{"_5" if file_type == "reviews" else ""}.json.gz'
+        f'https://snap.stanford.edu/data/amazon/productGraph/categoryFiles/{file_type}_{category}{"_5" if file_type == "reviews" else ""}.json.gz'
     )
     base_name = os.path.basename(url)
     local_filepath = os.path.join(path, base_name)
@@ -231,12 +250,12 @@ class AmazonReviews2014(AbstractDataset):
     return self.all_item_seqs, self.id_mapping
 
   def _process_reviews(
-      self, input_path: str, output_path: str
+      self, input_path: str | Sequence[str | tuple[str, str]], output_path: str
   ) -> tuple[dict[str, list[str]], dict[str, Any]]:
     """Process the reviews from the input path and save the data to the output path.
 
     Args:
-        input_path (str): The path to the input file containing the reviews.
+        input_path (str): The path(s) to the input file(s) containing reviews.
         output_path (str): The path to save the data.
 
     Returns:
@@ -246,20 +265,40 @@ class AmazonReviews2014(AbstractDataset):
     # Check if the processed data already exists
     seq_file = os.path.join(output_path, 'all_item_seqs.json')
     id_mapping_file = os.path.join(output_path, 'id_mapping.json')
+    item_source_file = os.path.join(output_path, 'item_sources.json')
     if os.path.exists(seq_file) and os.path.exists(id_mapping_file):
       self.log('[DATASET] Reviews have been processed...')
       with open(seq_file, 'r') as f:
         all_item_seqs = json.load(f)
       with open(id_mapping_file, 'r') as f:
         id_mapping = json.load(f)
+      if os.path.exists(item_source_file):
+        with open(item_source_file, 'r') as f:
+          self.item_sources = json.load(f)
+      else:
+        self.item_sources = self._infer_item_sources(all_item_seqs)
       return all_item_seqs, id_mapping
 
     self.log('[DATASET] Processing reviews...')
 
     # Load reviews
-    reviews = self._load_reviews(input_path)
-    item_seqs = get_item_seqs(reviews)
+    input_paths = [input_path] if isinstance(input_path, str) else input_path
+    item_seqs = {}
+    item_sources = collections.defaultdict(set)
+    prefix_users = len(input_paths) > 1
+    for entry in input_paths:
+      if isinstance(entry, tuple):
+        category, path = entry
+      else:
+        category, path = self.categories[0], entry
+      cur_item_seqs = get_item_seqs(self._load_reviews(path))
+      for user, sequence in cur_item_seqs.items():
+        user_key = f'{category}::{user}' if prefix_users else user
+        item_seqs[user_key] = sequence
+        for item in sequence:
+          item_sources[item].add(category)
     all_item_seqs, id_mapping = self._remap_ids(item_seqs)
+    self.item_sources = {k: sorted(v) for k, v in item_sources.items()}
 
     # Save data
     self.log('[DATASET] Saving mapping data...')
@@ -267,7 +306,20 @@ class AmazonReviews2014(AbstractDataset):
       json.dump(all_item_seqs, f)
     with open(id_mapping_file, 'w') as f:
       json.dump(id_mapping, f)
+    with open(item_source_file, 'w') as f:
+      json.dump(self.item_sources, f)
     return all_item_seqs, id_mapping
+
+  def _infer_item_sources(
+      self, item_seqs: dict[str, list[str]]
+  ) -> dict[str, list[str]]:
+    """Infer item source categories from prefixed user keys."""
+    item_sources = collections.defaultdict(set)
+    for user, sequence in item_seqs.items():
+      source = user.split('::', 1)[0] if '::' in user else self.categories[0]
+      for item in sequence:
+        item_sources[item].add(source)
+    return {k: sorted(v) for k, v in item_sources.items()}
 
   def _load_metadata(
       self, path: str, item2id: dict[str, int]
@@ -348,12 +400,12 @@ class AmazonReviews2014(AbstractDataset):
     return item2meta
 
   def _process_meta(
-      self, input_path: str, output_path: str
+      self, input_path: str | Sequence[str], output_path: str
   ) -> Optional[dict[str, Any]]:
     """Process metadata based on the specified process type.
 
     Args:
-        input_path (str): The path to the input metadata file.
+        input_path (str): The path(s) to the input metadata file.
         output_path (str): The path to save the processed metadata file.
 
     Returns:
@@ -375,7 +427,12 @@ class AmazonReviews2014(AbstractDataset):
       # No metadata processing required
       return None
 
-    item2raw_meta = self._load_metadata(path=input_path, item2id=self.item2id)
+    input_paths = [input_path] if isinstance(input_path, str) else input_path
+    item2raw_meta = {}
+    for path in input_paths:
+      item2raw_meta.update(
+          self._load_metadata(path=path, item2id=self.item2id)
+      )
     item2meta = None
     if process_mode == 'raw':
       item2meta = item2raw_meta
@@ -403,10 +460,23 @@ class AmazonReviews2014(AbstractDataset):
     raw_data_path = os.path.join(self.cache_dir, 'raw')
     os.makedirs(raw_data_path, exist_ok=True)
     with self.accelerator.main_process_first():  # only download once when ddp
-      reviews_localpath = self._download_raw(
-          path=raw_data_path, file_type='reviews'
-      )
-      meta_localpath = self._download_raw(path=raw_data_path, file_type='meta')
+      reviews_localpath = [
+          (
+              category,
+              self._download_raw(
+                  path=raw_data_path,
+                  category=category,
+                  file_type='reviews',
+              ),
+          )
+          for category in self.categories
+      ]
+      meta_localpath = [
+          self._download_raw(
+              path=raw_data_path, category=category, file_type='meta'
+          )
+          for category in self.categories
+      ]
 
     np.random.seed(12345)
 

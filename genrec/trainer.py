@@ -216,29 +216,45 @@ class Trainer:
     for batch in val_progress_bar:
       with torch.no_grad():
         batch = {k: v.to(self.accelerator.device) for k, v in batch.items()}
+        source_id = batch.pop('source_id', None)
+        n_return_sequences = (
+            self.evaluator.max_candidates
+            if source_id is not None
+            else self.evaluator.maxk
+        )
         if self.config[
             'use_ddp'
         ]:  # ddp, gather data from all devices for evaluation
           preds = self.model.module.generate(
-              batch, n_return_sequences=self.evaluator.maxk
+              batch, n_return_sequences=n_return_sequences
           )
-          all_preds, all_labels = self.accelerator.gather_for_metrics(
-              (preds, batch['labels'])
+          if source_id is not None:
+            all_preds, all_labels, all_source_id = (
+                self.accelerator.gather_for_metrics(
+                    (preds, batch['labels'], source_id)
+                )
+            )
+          else:
+            all_preds, all_labels = self.accelerator.gather_for_metrics(
+                (preds, batch['labels'])
+            )
+            all_source_id = None
+          results = self.evaluator.calculate_metrics(
+              all_preds, all_labels, all_source_id
           )
-          results = self.evaluator.calculate_metrics(all_preds, all_labels)
         else:
           preds = self.model.generate(
-              batch, n_return_sequences=self.evaluator.maxk
+              batch, n_return_sequences=n_return_sequences
           )
-          results = self.evaluator.calculate_metrics(preds, batch['labels'])
+          results = self.evaluator.calculate_metrics(
+              preds, batch['labels'], source_id
+          )
         for key, value in results.items():
           all_results[key].append(value)
 
     output_results = OrderedDict()
-    for metric in self.config['metrics']:
-      for k in self.config['topk']:
-        key = f'{metric}@{k}'
-        output_results[key] = torch.cat(all_results[key]).mean().item()
+    for key in sorted(all_results):
+      output_results[key] = torch.cat(all_results[key]).mean().item()
     return output_results
 
   def end(self):

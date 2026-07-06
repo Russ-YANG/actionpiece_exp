@@ -111,7 +111,7 @@ class ActionPiece(AbstractModel):
         input_ids=batch['input_ids'],
         attention_mask=batch['attention_mask'],
         max_length=self.tokenizer.actionpiece.n_categories + 1,
-        num_beams=self.config['num_beams'],
+        num_beams=max(self.config['num_beams'], n_return_sequences),
         num_return_sequences=n_return_sequences,
         return_score=False,
     )

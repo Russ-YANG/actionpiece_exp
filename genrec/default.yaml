@@ -32,6 +32,7 @@ epochs: 200
 max_grad_norm: 1.0      # None for no clipping, else a float value
 eval_interval: 1        # Evaluate every n epochs
 patience: 50            # Early stopping. Stop training after n epochs without improvement. Set to None to disable
+tokenizer_only: False   # Build tokenizer artifacts and exit before model training
 
 topk: [5,10,20,50]
 metrics: [ndcg,recall,err]

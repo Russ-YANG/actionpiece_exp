@@ -330,6 +330,25 @@ class ActionPieceTokenizer(AbstractTokenizer):
       if feat2cnt[feat] > 1:
         raise ValueError(f'[TOKENIZER] Conflicts found in features: {feat}')
 
+  def _get_initial_token_sources(
+      self, dataset: AbstractDataset, actionpiece: ActionPieceCore
+  ):
+    feat2sources = collections.defaultdict(set)
+    item_sources = getattr(dataset, 'item_sources', None)
+    for item, feats in self.item2feat.items():
+      if item_sources:
+        sources = item_sources.get(item, [dataset.category])
+      else:
+        sources = [dataset.category]
+      for i, feat in enumerate(feats):
+        feat2sources[(i, feat)].update(sources)
+
+    return {
+        actionpiece.rank[feat]: sorted(sources)
+        for feat, sources in feat2sources.items()
+        if feat in actionpiece.rank
+    }
+
   def _tokenize_once(self, item_seq):
     state_seq = []
     for item in item_seq:
@@ -402,13 +421,31 @@ class ActionPieceTokenizer(AbstractTokenizer):
     else:
       # Initialize ActionPiece from initial features
       self.logger.info('[TOKENIZER] Constructing ActionPiece vocabulary...')
+      merge_log_path = None
+      if self.config['actionpiece_merge_log']:
+        merge_log_path = self.config['actionpiece_merge_log_path']
+        if merge_log_path is None:
+          merge_log_path = os.path.join(
+              dataset.cache_dir, 'processed/actionpiece.merge_log.jsonl'
+          )
+        merge_log_dir = os.path.dirname(merge_log_path)
+        if merge_log_dir:
+          os.makedirs(merge_log_dir, exist_ok=True)
+        self.logger.info(
+            f'[TOKENIZER] Saving ActionPiece merge log to {merge_log_path}...'
+        )
       actionpiece = ActionPieceCore(
           state2feat=self.item2feat,
+      )
+      actionpiece.token_sources = self._get_initial_token_sources(
+          dataset, actionpiece
       )
       # Construct ActionPiece vocabulary
       actionpiece.train(
           state_corpus=dataset.split_data['train']['item_seq'],
           target_vocab_size=self.config['actionpiece_vocab_size'],
+          merge_log_path=merge_log_path,
+          merge_log_interval=self.config['actionpiece_merge_log_interval'],
       )
       actionpiece.save(tokenizer_path)
     return actionpiece

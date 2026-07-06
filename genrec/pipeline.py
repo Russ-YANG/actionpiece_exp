@@ -101,6 +101,14 @@ class Pipeline:
       self.tokenizer = utils.get_tokenizer(model_name)(
           self.config, self.raw_dataset
       )
+
+    if self.config['tokenizer_only']:
+      self.tokenized_datasets = None
+      self.model = None
+      self.trainer = None
+      self.log('Tokenizer-only mode enabled. Skipping model training.')
+      return
+
     self.tokenized_datasets = self.tokenizer.tokenize(self.split_datasets)
 
     # Model
@@ -139,6 +147,10 @@ class Pipeline:
     This method sets up data loaders, trains the model, evaluates it on the test
     set, and logs the results.
     """
+    if self.config['tokenizer_only']:
+      self.log('Tokenizer-only run completed.')
+      self.accelerator.end_training()
+      return
 
     def get_dataloader(split, batch_size, shuffle):
       return DataLoader(

@@ -93,10 +93,11 @@ class ActionPieceCore:
         pair in all the sequences.
   """
 
-  def __init__(self, state2feat=None, metadata=None):
+  def __init__(self, state2feat=None, metadata=None, token_sources=None):
     self.state2feat = state2feat
     self.metadata = metadata
     self.token2all_feat = {}
+    self.token_sources = token_sources or {}
 
     if self.state2feat is not None:
       self.n_categories, self.token2feat, self.feat2token, self.priority = (
@@ -414,12 +415,14 @@ class ActionPieceCore:
     """Merge the tokens inside a regular state."""
     if rule[0] == rule[1]:
       # One state never has the same token twice
-      return
+      return False
     if rule[0] in node.state and rule[1] in node.state:
       # new_token always appears first, i.e., coarse-to-fine.
       node.state = [new_token] + [
           state for state in node.state if state not in rule
       ]
+      return True
+    return False
 
   def _merge_state_context(self, state_node, context_node, rule, new_token):
     """Merge the tokens between a regular state and a context slot.
@@ -437,10 +440,13 @@ class ActionPieceCore:
       if rule[1] in state_node.state:
         state_node.state = [_ for _ in state_node.state if _ != rule[1]]
         context_node.state = [new_token]
+        return True
     elif rule[1] == context_node.state[0]:
       if rule[0] in state_node.state:
         state_node.state = [_ for _ in state_node.state if _ != rule[0]]
         context_node.state = [new_token]
+        return True
+    return False
 
   def _merge_two_states(self, node1, node2, rule, new_token):
     """Merge the tokens between two regular states.
@@ -462,12 +468,15 @@ class ActionPieceCore:
       node2.state = [item for item in node2.state if item != rule[1]]
       # Update context slot
       node1.next.state = [new_token]
+      return True
     elif rule[1] in node1.state and rule[0] in node2.state:
       # Update regular states
       node1.state = [item for item in node1.state if item != rule[1]]
       node2.state = [item for item in node2.state if item != rule[0]]
       # Update context slot
       node2.prev.state = [new_token]
+      return True
+    return False
 
   def _merge_single_rule(self, head, rule, new_token):
     """Merge the tokens in the linked list according to the new merging rule.
@@ -478,32 +487,37 @@ class ActionPieceCore:
         new_token (int): The new token to be inserted.
 
     Returns:
-        head (LinkedListState): The head of the updated linked list.
+        tuple: The updated head and merge type counts.
     """
     # Make a copy of the old linked list.
     # All the changes will be made on the new linked list immediately.
     new_link = head.copy_link()
+    merge_type_counts = collections.Counter()
     cur_node = new_link
     while cur_node:
       assert not cur_node.context, 'cur_node should be a regular state'
       # Regular state, check inside
-      self._merge_inside_regular_state(cur_node, rule, new_token)
+      if self._merge_inside_regular_state(cur_node, rule, new_token):
+        merge_type_counts['same_action'] += 1
       if not cur_node.next:
         break  # The last node
       if cur_node.next.state:  # Token in context slot
         # Check (regular state, context slot)
-        self._merge_state_context(cur_node, cur_node.next, rule, new_token)
+        if self._merge_state_context(cur_node, cur_node.next, rule, new_token):
+          merge_type_counts['action_context'] += 1
         # Check (context slot, regular state)
-        self._merge_state_context(
+        if self._merge_state_context(
             cur_node.next.next, cur_node.next, rule, new_token
-        )
+        ):
+          merge_type_counts['action_context'] += 1
       else:
         # Check (regular state, regular state)
-        self._merge_two_states(cur_node, cur_node.next.next, rule, new_token)
+        if self._merge_two_states(cur_node, cur_node.next.next, rule, new_token):
+          merge_type_counts['adjacent_actions'] += 1
 
       # Move to the next regular state
       cur_node = cur_node.next.next
-    return self._merge_empty_nodes(new_link)
+    return self._merge_empty_nodes(new_link), merge_type_counts
 
   def _update_pair2head_ids(self, diff_pair2cnt, head_id):
     """Update the inverted index of the pair2head_ids based on the diff of the pair counting.
@@ -578,6 +592,8 @@ class ActionPieceCore:
       self,
       state_corpus,
       target_vocab_size: int,
+      merge_log_path: str | None = None,
+      merge_log_interval: int = 1,
   ):
     """Train the ActionPiece tokenizer.
 
@@ -585,20 +601,55 @@ class ActionPieceCore:
         state_corpus (list[list[str]]): The state corpus to train the
           ActionPiece.
         target_vocab_size (int): The target vocabulary size.
+        merge_log_path (str, optional): JSONL path for recording merge steps.
+        merge_log_interval (int): Record every n merge steps.
     """
     token_corpus = self._get_token_corpus(state_corpus)
     # Build the data structures for the training process
     self._build(token_corpus)
+    merge_log_interval = max(int(merge_log_interval), 1)
+
+    def _write_log(log_f, record):
+      json.dump(record, log_f)
+      log_f.write('\n')
+
+    log_f = open(merge_log_path, 'w') if merge_log_path else None
+    if log_f is not None:
+      _write_log(
+          log_f,
+          {
+              'event': 'start',
+              'initial_vocab_size': self.n_init_feats,
+              'target_vocab_size': target_vocab_size,
+              'n_sequences': len(token_corpus),
+          },
+      )
 
     progress_bar = tqdm(range(target_vocab_size - self.n_init_feats))
-    while len(self.vocab) < target_vocab_size:
-      # Train for one step, the vocab size will be increased by 1
-      self._train_step()
-      progress_bar.set_description(
-          f'[Vocab size: {len(self.vocab)} / {target_vocab_size}] '
-      )
-      progress_bar.update(1)
-    progress_bar.close()
+    try:
+      while len(self.vocab) < target_vocab_size:
+        # Train for one step, the vocab size will be increased by 1
+        merge_record = self._train_step()
+        if log_f is not None and (
+            merge_record['step'] % merge_log_interval == 0
+            or len(self.vocab) == target_vocab_size
+        ):
+          _write_log(log_f, merge_record)
+        progress_bar.set_description(
+            f'[Vocab size: {len(self.vocab)} / {target_vocab_size}] '
+        )
+        progress_bar.update(1)
+    finally:
+      progress_bar.close()
+      if log_f is not None:
+        _write_log(
+            log_f,
+            {
+                'event': 'end',
+                'final_vocab_size': len(self.vocab),
+            },
+        )
+        log_f.close()
 
   def _train_step(self):
     """The difference is additionally recording priority scores here."""
@@ -617,6 +668,10 @@ class ActionPieceCore:
     self.rank[new_rule] = new_token
     self.vocab.append(new_rule)
     self.priority.append(-priority)
+    left_sources = set(self.token_sources.get(tk1, []))
+    right_sources = set(self.token_sources.get(tk2, []))
+    new_sources = sorted(left_sources | right_sources)
+    self.token_sources[new_token] = new_sources
 
     # Update data structures.
     # Only update the sequences that contain the token pair to merge.
@@ -625,11 +680,13 @@ class ActionPieceCore:
 
     # Count the diff of pairs in all the sequence to be updated.
     all_diff = collections.defaultdict(int)
+    merge_type_counts = collections.Counter()
     for head_id in head_to_update:
       # Update the linked list according to the new merging rule.
-      self.cur_corpus[head_id] = self._merge_single_rule(
+      self.cur_corpus[head_id], cur_merge_type_counts = self._merge_single_rule(
           self.cur_corpus[head_id], rule=(tk1, tk2), new_token=new_token
       )
+      merge_type_counts.update(cur_merge_type_counts)
       # Count the pairs in the updated sequence.
       new_pair2cnt = self._count_pairs_in_list(self.cur_corpus[head_id])
       # Count the diff of pair counting between the updated sequence and
@@ -642,6 +699,33 @@ class ActionPieceCore:
       add_cnt_inplace(all_diff, diff_pair2cnt)
     # Update the priority queue of the updated pair appearances.
     self._update_pq(all_diff)
+    return {
+        'event': 'merge',
+        'step': new_token - self.n_init_feats + 1,
+        'new_token': new_token,
+        'vocab_size': len(self.vocab),
+        'merged_tokens': [tk1, tk2],
+        'merged_rule': list(new_rule),
+        'priority': -priority,
+        'affected_sequences': len(head_to_update),
+        'left_token_rule': list(self.vocab[tk1]),
+        'right_token_rule': list(self.vocab[tk2]),
+        'left_token_sources': sorted(left_sources),
+        'right_token_sources': sorted(right_sources),
+        'new_token_sources': new_sources,
+        'source_merge_type': (
+            'cross_source'
+            if left_sources and right_sources and left_sources.isdisjoint(right_sources)
+            else 'mixed_or_shared_source'
+            if len(new_sources) > 1
+            else 'single_source'
+        ),
+        'merge_type_counts': dict(merge_type_counts),
+        'new_token_basic_features': [
+            list(feat) for feat in self._decode_single_token(new_token)
+        ],
+        'pair_count_updates': len(all_diff),
+    }
 
   def _random_walk_augmentation(self, state_seq: np.ndarray):
     """Random walk augmentation, flatten the state sequence into a sequence of initial tokens.

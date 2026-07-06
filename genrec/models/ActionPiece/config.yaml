@@ -27,6 +27,9 @@ n_hash_buckets: 128
 
 # Config for the action tokenizer
 actionpiece_vocab_size: 40000
+actionpiece_merge_log: True
+actionpiece_merge_log_interval: 1
+actionpiece_merge_log_path: ~
 
 # Config for the model
 num_beams: 50 # Number of beams for beam search
