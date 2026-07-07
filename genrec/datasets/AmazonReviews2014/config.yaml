@@ -14,5 +14,5 @@
 # ==============================================================================
 
 category: Sports_and_Outdoors # single category, comma-separated string, or list
-metadata: sentence # none / raw / sentence
+metadata: sentence # none / raw / sentence / sentence_image
 split: leave_one_out # leave_one_out

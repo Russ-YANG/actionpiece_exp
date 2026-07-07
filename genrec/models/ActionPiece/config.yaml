@@ -19,10 +19,18 @@ sent_emb_batch_size: 512
 sent_emb_dim: 768
 sent_emb_pca: -1 # -1 means no PCA, otherwise PCA dimension
 
+# Config for image embedding model, used when metadata=sentence_image
+image_emb_model: openai/clip-vit-base-patch32
+image_emb_batch_size: 64
+image_emb_dim: 512
+image_download_timeout: 10
+
 # Config for features
 n_threads: 32
 pq_n_codebooks: 4
 pq_codebook_size: 256
+image_pq_n_codebooks: 4
+image_pq_codebook_size: 256
 n_hash_buckets: 128
 
 # Config for the action tokenizer

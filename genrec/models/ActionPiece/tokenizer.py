@@ -16,6 +16,7 @@
 """ActionPiece tokenizer for GenRec."""
 
 import collections
+import io
 import json
 import os
 from typing import Any
@@ -25,9 +26,13 @@ from genrec.dataset import AbstractDataset
 from genrec.models.ActionPiece.core import ActionPieceCore
 from genrec.tokenizer import AbstractTokenizer
 import numpy as np
+from PIL import Image
+import requests
 from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
 import torch
+from transformers import CLIPModel
+from transformers import CLIPProcessor
 
 
 class ActionPieceTokenizer(AbstractTokenizer):
@@ -66,6 +71,12 @@ class ActionPieceTokenizer(AbstractTokenizer):
         'test': self.collate_fn_test,
     }
 
+  def _get_item_sentence(self, dataset: AbstractDataset, item: str) -> str:
+    item_meta = dataset.item2meta[item]
+    if isinstance(item_meta, dict):
+      return item_meta['sentence']
+    return item_meta
+
   def _encode_sent_emb(self, dataset: AbstractDataset, output_path: str):
     """Encodes the sentence embeddings for the given dataset and saves them to the specified output path.
 
@@ -77,20 +88,17 @@ class ActionPieceTokenizer(AbstractTokenizer):
     Returns:
         numpy.ndarray: The encoded sentence embeddings.
     """
-    assert self.config['metadata'] in ['sentence', 'all']
+    assert self.config['metadata'] in ['sentence', 'all', 'sentence_image']
 
     sent_emb_model = SentenceTransformer(self.config['sent_emb_model']).to(
         self.config['device']
     )
 
     meta_sentences = []  # 1-base, meta_sentences[0] -> item_id = 1
-    item2meta = None
-    if 'sentence' in dataset.item2meta:
-      item2meta = dataset.item2meta['sentence']
-    else:
-      item2meta = dataset.item2meta
     for i in range(1, dataset.n_items):
-      meta_sentences.append(item2meta[dataset.id_mapping['id2item'][i]])
+      meta_sentences.append(
+          self._get_item_sentence(dataset, dataset.id_mapping['id2item'][i])
+      )
     sent_embs = sent_emb_model.encode(
         meta_sentences,
         convert_to_numpy=True,
@@ -136,6 +144,129 @@ class ActionPieceTokenizer(AbstractTokenizer):
     )
     return sent_embs
 
+  def _get_image_url(self, dataset: AbstractDataset, item: str) -> str | None:
+    item_meta = dataset.item2meta[item]
+    if isinstance(item_meta, dict):
+      return item_meta.get('image_url')
+    return None
+
+  def _log_image_failure(
+      self, failure_log_path: str, item: str, image_url: str | None, reason: str
+  ):
+    with open(failure_log_path, 'a') as f:
+      f.write(
+          json.dumps(
+              {
+                  'item': item,
+                  'image_url': image_url,
+                  'reason': reason,
+              }
+          )
+          + '\n'
+      )
+
+  def _download_image(
+      self, item: str, image_url: str | None, failure_log_path: str
+  ) -> Image.Image | None:
+    if not image_url:
+      self._log_image_failure(failure_log_path, item, image_url, 'missing_url')
+      return None
+    try:
+      response = requests.get(
+          image_url, timeout=self.config['image_download_timeout']
+      )
+      response.raise_for_status()
+      return Image.open(io.BytesIO(response.content)).convert('RGB')
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+      self._log_image_failure(failure_log_path, item, image_url, repr(exc))
+      return None
+
+  def _encode_image_emb(self, dataset: AbstractDataset, output_path: str):
+    """Encode product images with CLIP and save item-aligned embeddings."""
+    if self.config['metadata'] != 'sentence_image':
+      raise ValueError('Image embeddings require metadata=sentence_image.')
+
+    image_emb_model = CLIPModel.from_pretrained(
+        self.config['image_emb_model']
+    ).to(self.config['device'])
+    image_processor = CLIPProcessor.from_pretrained(
+        self.config['image_emb_model']
+    )
+    image_emb_model.eval()
+
+    failure_log_path = os.path.join(
+        dataset.cache_dir, 'processed', 'image_download_failures.jsonl'
+    )
+    if os.path.exists(failure_log_path):
+      os.remove(failure_log_path)
+
+    image_emb_dim = self.config['image_emb_dim']
+    image_embs = np.zeros((dataset.n_items - 1, image_emb_dim), dtype=np.float32)
+    pending_images = []
+    pending_indices = []
+
+    def flush_batch():
+      if not pending_images:
+        return
+      inputs = image_processor(
+          images=pending_images, return_tensors='pt', padding=True
+      )
+      inputs = {k: v.to(self.config['device']) for k, v in inputs.items()}
+      with torch.no_grad():
+        batch_embs = image_emb_model.get_image_features(**inputs)
+        batch_embs = torch.nn.functional.normalize(batch_embs, dim=-1)
+      batch_embs = batch_embs.detach().cpu().numpy().astype(np.float32)
+      if batch_embs.shape[-1] != image_emb_dim:
+        raise ValueError(
+            '[TOKENIZER] CLIP image embedding dimension mismatch: '
+            f'got {batch_embs.shape[-1]}, expected {image_emb_dim}.'
+        )
+      for idx, emb in zip(pending_indices, batch_embs):
+        image_embs[idx] = emb
+      pending_images.clear()
+      pending_indices.clear()
+
+    self.logger.info('[TOKENIZER] Encoding image embeddings...')
+    for i in tqdm.tqdm(range(1, dataset.n_items)):
+      item = dataset.id_mapping['id2item'][i]
+      image = self._download_image(
+          item, self._get_image_url(dataset, item), failure_log_path
+      )
+      if image is None:
+        continue
+      pending_images.append(image)
+      pending_indices.append(i - 1)
+      if len(pending_images) >= self.config['image_emb_batch_size']:
+        flush_batch()
+    flush_batch()
+
+    image_embs.tofile(output_path)
+    self.logger.info(
+        f'[TOKENIZER] Image download failures saved to {failure_log_path}'
+    )
+    return image_embs
+
+  def _get_image_embs(self, dataset: AbstractDataset) -> np.ndarray:
+    image_emb_path = os.path.join(
+        dataset.cache_dir,
+        'processed',
+        f'{os.path.basename(self.config["image_emb_model"])}.image_emb',
+    )
+    image_emb_dim = self.config['image_emb_dim']
+    if os.path.exists(image_emb_path):
+      self.logger.info(
+          f'[TOKENIZER] Loading image embeddings from {image_emb_path}...'
+      )
+      image_embs = np.fromfile(image_emb_path, dtype=np.float32).reshape(
+          -1, image_emb_dim
+      )
+    else:
+      image_embs = self._encode_image_emb(dataset, image_emb_path)
+    self.logger.info(
+        f'[TOKENIZER] Image embeddings shape: {image_embs.shape}'
+    )
+    return image_embs
+
   def _get_items_for_training(self, dataset: AbstractDataset) -> np.ndarray:
     items_for_training = set()
     for item_seq in dataset.split_data['train']['item_seq']:
@@ -150,25 +281,29 @@ class ActionPieceTokenizer(AbstractTokenizer):
       mask[dataset.item2id[item] - 1] = True
     return mask
 
-  def _sent_emb_to_sem_id(
-      self, dataset: AbstractDataset, sent_embs: np.ndarray
+  def _emb_to_sem_id(
+      self,
+      dataset: AbstractDataset,
+      embs: np.ndarray,
+      n_codebooks: int,
+      codebook_size: int,
   ) -> dict[Any, Any]:
     # Get the sentence embeddings for training
     training_item_mask = self._get_items_for_training(dataset)
-    embs_for_training = sent_embs[training_item_mask]
+    embs_for_training = embs[training_item_mask]
 
     # Train the index
     # Take the vector quantized codes as item features
 
     faiss.omp_set_num_threads(self.config['n_threads'])
     index = faiss.index_factory(
-        sent_embs.shape[-1],
-        f"OPQ{self.config['pq_n_codebooks']},IVF1,PQ{self.config['pq_n_codebooks']}x{int(np.log2(self.config['pq_codebook_size']))}",
+        embs.shape[-1],
+        f'OPQ{n_codebooks},IVF1,PQ{n_codebooks}x{int(np.log2(codebook_size))}',
         faiss.METRIC_INNER_PRODUCT,
     )
     self.logger.info('[TOKENIZER] Training index...')
     index.train(embs_for_training)
-    index.add(sent_embs)
+    index.add(embs)
 
     ivf_index = faiss.downcast_index(index.index)
     invlists = faiss.extract_index_ivf(ivf_index).invlists
@@ -182,6 +317,16 @@ class ActionPieceTokenizer(AbstractTokenizer):
       item = dataset.id_mapping['id2item'][i + 1]
       item2sem_ids[item] = tuple(sem_ids[i].tolist())
     return item2sem_ids
+
+  def _sent_emb_to_sem_id(
+      self, dataset: AbstractDataset, sent_embs: np.ndarray
+  ) -> dict[Any, Any]:
+    return self._emb_to_sem_id(
+        dataset,
+        sent_embs,
+        n_codebooks=self.config['pq_n_codebooks'],
+        codebook_size=self.config['pq_codebook_size'],
+    )
 
   def _get_sem_ids(self, dataset: AbstractDataset) -> dict[Any, Any]:
     """Get the semantic IDs from the dataset.
@@ -222,6 +367,44 @@ class ActionPieceTokenizer(AbstractTokenizer):
       return {
           k: v[: self.config['pq_n_codebooks']] for k, v in item2sem_ids.items()
       }
+
+  def _image_emb_to_sem_id(
+      self, dataset: AbstractDataset, image_embs: np.ndarray
+  ) -> dict[Any, Any]:
+    return self._emb_to_sem_id(
+        dataset,
+        image_embs,
+        n_codebooks=self.config['image_pq_n_codebooks'],
+        codebook_size=self.config['image_pq_codebook_size'],
+    )
+
+  def _get_image_sem_ids(self, dataset: AbstractDataset) -> dict[Any, Any]:
+    image_sem_ids_path = os.path.join(
+        dataset.cache_dir,
+        'processed',
+        f'{os.path.basename(self.config["image_emb_model"])}.image_sem_ids',
+    )
+    if not os.path.exists(image_sem_ids_path):
+      self.logger.info(
+          '[TOKENIZER] Image semantic IDs not found. Training image index...'
+      )
+      image_embs = self._get_image_embs(dataset)
+      item2sem_ids = self._image_emb_to_sem_id(dataset, image_embs)
+      self.logger.info(
+          f'[TOKENIZER] Saving image semantic IDs to {image_sem_ids_path}...'
+      )
+      with open(image_sem_ids_path, 'w') as f:
+        json.dump(item2sem_ids, f)
+      return item2sem_ids
+    self.logger.info(
+        f'[TOKENIZER] Loading image semantic IDs from {image_sem_ids_path}...'
+    )
+    with open(image_sem_ids_path, 'r') as f:
+      item2sem_ids = json.load(f)
+    return {
+        k: v[: self.config['image_pq_n_codebooks']]
+        for k, v in item2sem_ids.items()
+    }
 
   def _get_attr_ids(self, dataset: AbstractDataset):
     """Get the attribute IDs from the dataset."""
@@ -306,6 +489,12 @@ class ActionPieceTokenizer(AbstractTokenizer):
       return item2feat
     self.logger.info('[TOKENIZER] Generating item features...')
     item2sem_ids = self._get_sem_ids(dataset)
+    if self.config['metadata'] == 'sentence_image':
+      item2image_sem_ids = self._get_image_sem_ids(dataset)
+      item2sem_ids = {
+          item: tuple(item2sem_ids[item]) + tuple(item2image_sem_ids[item])
+          for item in item2sem_ids
+      }
     item2attr_ids = self._get_attr_ids(dataset)
     item2feat = self._combine_features(item2sem_ids, item2attr_ids)
     item2hashed_feat = self._get_hashed_feat(dataset, item2feat)
@@ -407,9 +596,10 @@ class ActionPieceTokenizer(AbstractTokenizer):
     self.item2feat = self._get_item2feat(dataset)
     self._check_conflicts(self.item2feat)
 
-    tokenizer_path = os.path.join(
-        dataset.cache_dir, 'processed/actionpiece.json'
-    )
+    tokenizer_filename = 'actionpiece.json'
+    if self.config['metadata'] == 'sentence_image':
+      tokenizer_filename = 'actionpiece.sentence_image.json'
+    tokenizer_path = os.path.join(dataset.cache_dir, 'processed', tokenizer_filename)
     if os.path.exists(tokenizer_path):
       # If trained tokenizer exists, load it
       self.logger.info(

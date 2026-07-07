@@ -370,6 +370,18 @@ class AmazonReviews2014(AbstractDataset):
       sentence = clean_text(raw)
     return sentence + ' '
 
+  def _extract_image_url(self, meta: dict[str, Any]) -> Optional[str]:
+    """Extract the first available product image URL from raw metadata."""
+    for key in ('imUrl', 'imageURLHighRes', 'imageURL'):
+      value = meta.get(key)
+      if isinstance(value, str) and value:
+        return value
+      if isinstance(value, list):
+        for url in value:
+          if isinstance(url, str) and url:
+            return url
+    return None
+
   def _extract_meta_sentences(self, metadata: dict[str, Any]) -> dict[str, str]:
     """Extracts meta sentences from the given metadata dictionary.
 
@@ -397,6 +409,20 @@ class AmazonReviews2014(AbstractDataset):
         if feature in keys:
           meta_sentence += self._sent_process(meta[feature])
       item2meta[item] = meta_sentence
+    return item2meta
+
+  def _extract_meta_sentence_images(
+      self, metadata: dict[str, Any]
+  ) -> dict[str, dict[str, Optional[str]]]:
+    """Extract text and image URL metadata for each item."""
+    self.log('[DATASET] Extracting meta sentences and image URLs...')
+    item2meta = {}
+    item2sentence = self._extract_meta_sentences(metadata)
+    for item, meta in tqdm.tqdm(metadata.items()):
+      item2meta[item] = {
+          'sentence': item2sentence[item],
+          'image_url': self._extract_image_url(meta),
+      }
     return item2meta
 
   def _process_meta(
@@ -439,6 +465,8 @@ class AmazonReviews2014(AbstractDataset):
     elif process_mode == 'sentence':
       # Extract sentences from metadata
       item2meta = self._extract_meta_sentences(metadata=item2raw_meta)
+    elif process_mode == 'sentence_image':
+      item2meta = self._extract_meta_sentence_images(metadata=item2raw_meta)
     else:
       raise NotImplementedError('Metadata processing type not implemented.')
 
