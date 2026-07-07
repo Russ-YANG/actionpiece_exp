@@ -31,6 +31,7 @@ import requests
 from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
 import torch
+import tqdm
 from transformers import CLIPModel
 from transformers import CLIPProcessor
 
