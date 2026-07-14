@@ -19,11 +19,13 @@ sent_emb_batch_size: 512
 sent_emb_dim: 768
 sent_emb_pca: -1 # -1 means no PCA, otherwise PCA dimension
 
-# Config for image embedding model, used when metadata=sentence_image
+# Config for image embedding model, used when metadata=sentence_image or
+# metadata=sentence_image_fused
 image_emb_model: openai/clip-vit-base-patch32
 image_emb_batch_size: 64
 image_emb_dim: 512
 image_download_timeout: 10
+fused_image_weight: 1.0
 
 # Config for features
 n_threads: 32

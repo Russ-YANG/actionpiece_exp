@@ -89,7 +89,12 @@ class ActionPieceTokenizer(AbstractTokenizer):
     Returns:
         numpy.ndarray: The encoded sentence embeddings.
     """
-    assert self.config['metadata'] in ['sentence', 'all', 'sentence_image']
+    assert self.config['metadata'] in [
+        'sentence',
+        'all',
+        'sentence_image',
+        'sentence_image_fused',
+    ]
 
     sent_emb_model = SentenceTransformer(self.config['sent_emb_model']).to(
         self.config['device']
@@ -184,8 +189,14 @@ class ActionPieceTokenizer(AbstractTokenizer):
 
   def _encode_image_emb(self, dataset: AbstractDataset, output_path: str):
     """Encode product images with CLIP and save item-aligned embeddings."""
-    if self.config['metadata'] != 'sentence_image':
-      raise ValueError('Image embeddings require metadata=sentence_image.')
+    if self.config['metadata'] not in [
+        'sentence_image',
+        'sentence_image_fused',
+    ]:
+      raise ValueError(
+          'Image embeddings require metadata=sentence_image or '
+          'metadata=sentence_image_fused.'
+      )
 
     image_emb_model = CLIPModel.from_pretrained(
         self.config['image_emb_model']
@@ -407,6 +418,57 @@ class ActionPieceTokenizer(AbstractTokenizer):
         for k, v in item2sem_ids.items()
     }
 
+  def _normalize_embs(self, embs: np.ndarray) -> np.ndarray:
+    norms = np.linalg.norm(embs, axis=-1, keepdims=True)
+    norms = np.maximum(norms, 1e-12)
+    return embs / norms
+
+  def _get_fused_sem_ids(self, dataset: AbstractDataset) -> dict[Any, Any]:
+    sent_model_name = os.path.basename(self.config['sent_emb_model'])
+    image_model_name = os.path.basename(self.config['image_emb_model'])
+    image_weight = self.config['fused_image_weight']
+    fused_sem_ids_path = os.path.join(
+        dataset.cache_dir,
+        'processed',
+        (
+            f'{sent_model_name}.{image_model_name}.'
+            f'w{image_weight}.fused_sem_ids'
+        ),
+    )
+    if not os.path.exists(fused_sem_ids_path):
+      self.logger.info(
+          '[TOKENIZER] Fused semantic IDs not found. '
+          'Training fused text-image index...'
+      )
+      sent_embs = self._normalize_embs(self._get_sent_embs(dataset))
+      image_embs = self._normalize_embs(self._get_image_embs(dataset))
+      fused_embs = np.concatenate(
+          [sent_embs, image_weight * image_embs], axis=-1
+      ).astype(np.float32)
+      self.logger.info(
+          f'[TOKENIZER] Fused embeddings shape: {fused_embs.shape}'
+      )
+      item2sem_ids = self._emb_to_sem_id(
+          dataset,
+          fused_embs,
+          n_codebooks=self.config['pq_n_codebooks'],
+          codebook_size=self.config['pq_codebook_size'],
+      )
+      self.logger.info(
+          f'[TOKENIZER] Saving fused semantic IDs to {fused_sem_ids_path}...'
+      )
+      with open(fused_sem_ids_path, 'w') as f:
+        json.dump(item2sem_ids, f)
+      return item2sem_ids
+    self.logger.info(
+        f'[TOKENIZER] Loading fused semantic IDs from {fused_sem_ids_path}...'
+    )
+    with open(fused_sem_ids_path, 'r') as f:
+      item2sem_ids = json.load(f)
+    return {
+        k: v[: self.config['pq_n_codebooks']] for k, v in item2sem_ids.items()
+    }
+
   def _get_attr_ids(self, dataset: AbstractDataset):
     """Get the attribute IDs from the dataset."""
     if 'attr_id' in dataset.item2meta:
@@ -489,7 +551,10 @@ class ActionPieceTokenizer(AbstractTokenizer):
         item2feat = json.load(f)
       return item2feat
     self.logger.info('[TOKENIZER] Generating item features...')
-    item2sem_ids = self._get_sem_ids(dataset)
+    if self.config['metadata'] == 'sentence_image_fused':
+      item2sem_ids = self._get_fused_sem_ids(dataset)
+    else:
+      item2sem_ids = self._get_sem_ids(dataset)
     if self.config['metadata'] == 'sentence_image':
       item2image_sem_ids = self._get_image_sem_ids(dataset)
       item2sem_ids = {
@@ -600,6 +665,8 @@ class ActionPieceTokenizer(AbstractTokenizer):
     tokenizer_filename = 'actionpiece.json'
     if self.config['metadata'] == 'sentence_image':
       tokenizer_filename = 'actionpiece.sentence_image.json'
+    elif self.config['metadata'] == 'sentence_image_fused':
+      tokenizer_filename = 'actionpiece.sentence_image_fused.json'
     tokenizer_path = os.path.join(dataset.cache_dir, 'processed', tokenizer_filename)
     if os.path.exists(tokenizer_path):
       # If trained tokenizer exists, load it
