@@ -1,4 +1,5 @@
 cache/
+.env.local
 ckpt/
 logs/
 tensorboard/

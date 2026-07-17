@@ -462,7 +462,7 @@ class AmazonReviews2014(AbstractDataset):
     item2meta = None
     if process_mode == 'raw':
       item2meta = item2raw_meta
-    elif process_mode == 'sentence':
+    elif process_mode in ['sentence', 'qwen_text']:
       # Extract sentences from metadata
       item2meta = self._extract_meta_sentences(metadata=item2raw_meta)
     elif process_mode in ['sentence_image', 'sentence_image_fused']:

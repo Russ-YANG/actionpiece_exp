@@ -3,6 +3,15 @@
 This repository provides the code for implementing ActionPiece described in our
 **ICML 25 Spotlight** paper "[Contextually Tokenizing Action Sequences for Generative Recommendation](https://arxiv.org/abs/2502.13581)".
 
+For the current multimodal experiment context, development conventions, cache
+notes, and validation checklist, see [AGENTS.md](AGENTS.md).
+
+The Beauty Qwen text-only E1 tokenizer experiment can be run with:
+
+```bash
+python main.py --config_file=experiments/e1_qwen_text_beauty.yaml
+```
+
 Unlike existing generative recommendation (GR) models that tokenize each action
 independently, we propose ActionPiece, a method that
 **explicitly incorporates context into action sequence tokenization**.

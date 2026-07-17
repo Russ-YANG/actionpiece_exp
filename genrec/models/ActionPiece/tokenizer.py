@@ -16,14 +16,17 @@
 """ActionPiece tokenizer for GenRec."""
 
 import collections
+import hashlib
 import io
 import json
 import os
+import re
 from typing import Any
 
 import faiss
 from genrec.dataset import AbstractDataset
 from genrec.models.ActionPiece.core import ActionPieceCore
+from genrec.models.ActionPiece.qwen_api import QwenApiTextEncoder
 from genrec.tokenizer import AbstractTokenizer
 import numpy as np
 from PIL import Image
@@ -78,6 +81,38 @@ class ActionPieceTokenizer(AbstractTokenizer):
       return item_meta['sentence']
     return item_meta
 
+  def _sent_artifact_stem(self) -> str:
+    """Return a cache-safe sentence encoder identity."""
+    model_name = os.path.basename(self.config['sent_emb_model'])
+    if self.config['sent_emb_backend'] != 'qwen_api':
+      return model_name
+    safe_model_name = re.sub(r'[^A-Za-z0-9._-]+', '-', model_name)
+    instruction_hash = hashlib.sha256(
+        self.config['qwen_api_instruction'].encode('utf-8')
+    ).hexdigest()[:12]
+    return (
+        f'qwen_api.{safe_model_name}.d{self.config["sent_emb_dim"]}.'
+        f'i{instruction_hash}'
+    )
+
+  def _semantic_artifact_stem(self) -> str:
+    if self.config['sent_emb_backend'] != 'qwen_api':
+      return self._sent_artifact_stem()
+    return (
+        f'{self._sent_artifact_stem()}.'
+        f'opq{self.config["pq_n_codebooks"]}x'
+        f'{self.config["pq_codebook_size"]}.'
+        f'seed{self.config["rand_seed"]}'
+    )
+
+  def _feature_artifact_stem(self) -> str:
+    if self.config['metadata'] != 'qwen_text':
+      return self.config['metadata']
+    return (
+        f'qwen_text.{self._semantic_artifact_stem()}.'
+        f'h{self.config["n_hash_buckets"]}'
+    )
+
   def _encode_sent_emb(self, dataset: AbstractDataset, output_path: str):
     """Encodes the sentence embeddings for the given dataset and saves them to the specified output path.
 
@@ -91,27 +126,59 @@ class ActionPieceTokenizer(AbstractTokenizer):
     """
     assert self.config['metadata'] in [
         'sentence',
+        'qwen_text',
         'all',
         'sentence_image',
         'sentence_image_fused',
     ]
 
-    sent_emb_model = SentenceTransformer(self.config['sent_emb_model']).to(
-        self.config['device']
-    )
-
     meta_sentences = []  # 1-base, meta_sentences[0] -> item_id = 1
+    item_ids = []
     for i in range(1, dataset.n_items):
+      item = dataset.id_mapping['id2item'][i]
+      item_ids.append(item)
       meta_sentences.append(
-          self._get_item_sentence(dataset, dataset.id_mapping['id2item'][i])
+          self._get_item_sentence(dataset, item)
       )
-    sent_embs = sent_emb_model.encode(
-        meta_sentences,
-        convert_to_numpy=True,
-        batch_size=self.config['sent_emb_batch_size'],
-        show_progress_bar=True,
-        device=self.config['device'],
-    )
+
+    if self.config['sent_emb_backend'] == 'qwen_api':
+      if self.config['metadata'] != 'qwen_text':
+        raise ValueError('Qwen API E1 requires metadata=qwen_text.')
+      if self.config['sent_emb_pca'] > 0:
+        raise ValueError('Qwen API E1 does not support sent_emb_pca.')
+      encoder = QwenApiTextEncoder(
+          model=self.config['sent_emb_model'],
+          instruction=self.config['qwen_api_instruction'],
+          dimension=self.config['sent_emb_dim'],
+          batch_size=self.config['qwen_api_batch_size'],
+          timeout=self.config['qwen_api_timeout'],
+          max_retries=self.config['qwen_api_max_retries'],
+          env_file=self.config['qwen_api_env_file'],
+          endpoint=self.config['qwen_api_endpoint'],
+      )
+      sent_embs = encoder.encode(
+          meta_sentences,
+          item_ids,
+          output_path,
+          progress_callback=lambda completed, total: self.logger.info(
+              '[TOKENIZER] Qwen text embeddings: %d/%d', completed, total
+          ),
+      )
+    elif self.config['sent_emb_backend'] == 'sentence_transformers':
+      sent_emb_model = SentenceTransformer(self.config['sent_emb_model']).to(
+          self.config['device']
+      )
+      sent_embs = sent_emb_model.encode(
+          meta_sentences,
+          convert_to_numpy=True,
+          batch_size=self.config['sent_emb_batch_size'],
+          show_progress_bar=True,
+          device=self.config['device'],
+      )
+    else:
+      raise ValueError(
+          f'Unknown sent_emb_backend: {self.config["sent_emb_backend"]}'
+      )
 
     # PCA
     if self.config['sent_emb_pca'] > 0:
@@ -120,7 +187,8 @@ class ActionPieceTokenizer(AbstractTokenizer):
       pca = PCA(n_components=self.config['sent_emb_pca'], whiten=True)
       sent_embs = pca.fit_transform(sent_embs)
 
-    sent_embs.tofile(output_path)
+    if self.config['sent_emb_backend'] != 'qwen_api':
+      sent_embs.tofile(output_path)
     return sent_embs
 
   def _get_sent_embs(self, dataset: AbstractDataset) -> np.ndarray:
@@ -128,7 +196,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
     sent_emb_path = os.path.join(
         dataset.cache_dir,
         'processed',
-        f'{os.path.basename(self.config["sent_emb_model"])}.sent_emb',
+        f'{self._sent_artifact_stem()}.sent_emb',
     )
     sent_emb_dim = (
         self.config['sent_emb_dim']
@@ -145,6 +213,14 @@ class ActionPieceTokenizer(AbstractTokenizer):
     else:
       self.logger.info('[TOKENIZER] Encoding sentence embeddings...')
       sent_embs = self._encode_sent_emb(dataset, sent_emb_path)
+    expected_shape = (dataset.n_items - 1, sent_emb_dim)
+    if sent_embs.shape != expected_shape:
+      raise ValueError(
+          f'[TOKENIZER] Sentence embedding shape {sent_embs.shape} does not '
+          f'match expected shape {expected_shape}.'
+      )
+    if not np.isfinite(sent_embs).all():
+      raise ValueError('[TOKENIZER] Sentence embeddings contain NaN or Inf.')
     self.logger.info(
         f'[TOKENIZER] Sentence embeddings shape: {sent_embs.shape}'
     )
@@ -357,7 +433,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
     sem_ids_path = os.path.join(
         dataset.cache_dir,
         'processed',
-        f'{os.path.basename(self.config["sent_emb_model"])}.sem_ids',
+        f'{self._semantic_artifact_stem()}.sem_ids',
     )
     if not os.path.exists(sem_ids_path):
       self.logger.info(
@@ -543,7 +619,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
     """
     feat_path = os.path.join(
         dataset.cache_dir,
-        f'processed/item.{self.config["metadata"]}.feat',
+        f'processed/item.{self._feature_artifact_stem()}.feat',
     )
     if os.path.exists(feat_path):
       self.logger.info(f'[TOKENIZER] Loading item features from {feat_path}...')
@@ -667,6 +743,11 @@ class ActionPieceTokenizer(AbstractTokenizer):
       tokenizer_filename = 'actionpiece.sentence_image.json'
     elif self.config['metadata'] == 'sentence_image_fused':
       tokenizer_filename = 'actionpiece.sentence_image_fused.json'
+    elif self.config['metadata'] == 'qwen_text':
+      tokenizer_filename = (
+          f'actionpiece.{self._feature_artifact_stem()}.'
+          f'v{self.config["actionpiece_vocab_size"]}.json'
+      )
     tokenizer_path = os.path.join(dataset.cache_dir, 'processed', tokenizer_filename)
     if os.path.exists(tokenizer_path):
       # If trained tokenizer exists, load it
@@ -683,8 +764,14 @@ class ActionPieceTokenizer(AbstractTokenizer):
       if self.config['actionpiece_merge_log']:
         merge_log_path = self.config['actionpiece_merge_log_path']
         if merge_log_path is None:
+          merge_log_filename = 'actionpiece.merge_log.jsonl'
+          if self.config['metadata'] == 'qwen_text':
+            merge_log_filename = (
+                f'actionpiece.{self._feature_artifact_stem()}.'
+                f'v{self.config["actionpiece_vocab_size"]}.merge_log.jsonl'
+            )
           merge_log_path = os.path.join(
-              dataset.cache_dir, 'processed/actionpiece.merge_log.jsonl'
+              dataset.cache_dir, 'processed', merge_log_filename
           )
         merge_log_dir = os.path.dirname(merge_log_path)
         if merge_log_dir:

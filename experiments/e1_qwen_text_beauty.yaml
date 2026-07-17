@@ -1,0 +1,23 @@
+# E1: replace the paper's sentence-t5 item encoder with the Qwen API while
+# preserving the four-code OPQ/PQ and ActionPiece pipeline.
+category: Beauty
+metadata: qwen_text
+sent_emb_backend: qwen_api
+sent_emb_model: qwen3-vl-embedding
+sent_emb_dim: 768
+sent_emb_pca: -1
+qwen_api_env_file: .env.local
+qwen_api_batch_size: 20
+qwen_api_timeout: 120
+qwen_api_max_retries: 5
+qwen_api_instruction: >-
+  Represent this e-commerce product for semantic similarity and sequential
+  recommendation. Capture its category, function, attributes, style, and likely
+  user intent.
+pq_n_codebooks: 4
+pq_codebook_size: 256
+# Faiss 1.8 on Apple Silicon can segfault when OPQ training uses the upstream
+# default of 32 OpenMP threads. One thread is stable and deterministic here.
+n_threads: 1
+tokenizer_only: true
+run_id: beauty_e1_qwen_text

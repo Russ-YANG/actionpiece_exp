@@ -29,6 +29,12 @@ def parse_args():
   parser.add_argument(
       '--dataset', type=str, default='AmazonReviews2014', help='Dataset name'
   )
+  parser.add_argument(
+      '--config_file',
+      action='append',
+      default=None,
+      help='Additional YAML config file; may be specified more than once.',
+  )
   return parser.parse_known_args()
 
 
@@ -40,5 +46,6 @@ if __name__ == '__main__':
       model_name=args.model,
       dataset_name=args.dataset,
       config_dict=command_line_configs,
+      config_file=args.config_file,
   )
   pipeline.run()
