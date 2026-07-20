@@ -76,7 +76,8 @@ The active E1 uses the explicit open-weight `Qwen/Qwen3-VL-Embedding-8B`
 checkpoint at revision `2c4565515e0f265c6511776e7193b22c0968ddc7`, not the
 parameter-undisclosed DashScope API model. It emits 768-dimensional,
 L2-normalized MRL prefixes with the shared English instruction, a maximum input
-length of 2048 tokens, and uses SDPA in bfloat16. It is configured in
+length of 2048 tokens, and uses SDPA in bfloat16. The official encoder source is
+fixed at revision `393e2978d27852b0d0230d6994f37f9c15bed73c`. It is configured in
 `experiments/e1_qwen3_vl_8b_text_beauty.yaml` and has a dedicated local-backend
 cache identity. Run its tokenizer-only stage on the RTX PRO 6000 with:
 

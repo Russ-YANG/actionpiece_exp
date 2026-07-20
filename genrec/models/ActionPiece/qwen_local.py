@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+import sys
 from typing import Any, Callable, Sequence
 
 import numpy as np
@@ -39,6 +40,8 @@ class QwenLocalTextEncoder:
       model_path: str,
       model_id: str,
       model_revision: str,
+      repo_path: str,
+      code_revision: str,
       instruction: str,
       dimension: int,
       batch_size: int = 8,
@@ -57,6 +60,8 @@ class QwenLocalTextEncoder:
     self.model_path = model_path
     self.model_id = model_id
     self.model_revision = model_revision
+    self.repo_path = repo_path
+    self.code_revision = code_revision
     self.instruction = instruction
     self.dimension = dimension
     self.batch_size = batch_size
@@ -78,6 +83,14 @@ class QwenLocalTextEncoder:
       raise ValueError(f'Unsupported torch dtype: {self.torch_dtype}')
     model_factory = self.model_factory
     if model_factory is None:
+      repo_path = Path(self.repo_path).expanduser().resolve()
+      module_path = repo_path / 'src/models/qwen3_vl_embedding.py'
+      if not module_path.exists():
+        raise RuntimeError(
+            f'Qwen3-VL-Embedding source was not found at {module_path}.'
+        )
+      if str(repo_path) not in sys.path:
+        sys.path.insert(0, str(repo_path))
       try:
         from src.models.qwen3_vl_embedding import Qwen3VLEmbedder
       except ImportError as exc:
@@ -89,7 +102,7 @@ class QwenLocalTextEncoder:
     return model_factory(
         model_name_or_path=self.model_path,
         max_length=self.max_length,
-        torch_dtype=dtype,
+        dtype=dtype,
         attn_implementation=self.attn_implementation,
     )
 
@@ -123,6 +136,7 @@ class QwenLocalTextEncoder:
         'backend': 'qwen_local',
         'model_id': self.model_id,
         'model_revision': self.model_revision,
+        'code_revision': self.code_revision,
         'instruction_sha256': instruction_sha256,
         'dimension': self.dimension,
         'max_length': self.max_length,
@@ -229,6 +243,7 @@ class QwenLocalTextEncoder:
         {
             **expected_identity,
             'model_path': self.model_path,
+            'repo_path': self.repo_path,
             'native_dimension': native_dimension,
             'batch_size': self.batch_size,
             'instruction': self.instruction,

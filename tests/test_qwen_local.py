@@ -32,6 +32,8 @@ class QwenLocalTextEncoderTest(unittest.TestCase):
         model_path='/models/Qwen3-VL-Embedding-8B',
         model_id='Qwen/Qwen3-VL-Embedding-8B',
         model_revision='test-revision',
+        repo_path='/repos/Qwen3-VL-Embedding',
+        code_revision='test-code-revision',
         instruction='Represent the product.',
         dimension=3,
         batch_size=batch_size,

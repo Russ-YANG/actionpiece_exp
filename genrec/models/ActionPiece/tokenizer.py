@@ -100,6 +100,9 @@ class ActionPieceTokenizer(AbstractTokenizer):
       revision = re.sub(
           r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_model_revision']
       )[:12]
+      code_revision = re.sub(
+          r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_code_revision']
+      )[:12]
       dtype = re.sub(
           r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_torch_dtype']
       )
@@ -109,7 +112,8 @@ class ActionPieceTokenizer(AbstractTokenizer):
           self.config['qwen_local_attn_implementation'],
       )
       stem += (
-          f'.r{revision}.m{self.config["qwen_local_max_length"]}.'
+          f'.r{revision}.c{code_revision}.'
+          f'm{self.config["qwen_local_max_length"]}.'
           f't{dtype}.a{attention}'
       )
     return stem
@@ -192,6 +196,8 @@ class ActionPieceTokenizer(AbstractTokenizer):
           model_path=self.config['qwen_local_model_path'],
           model_id=self.config['sent_emb_model'],
           model_revision=self.config['qwen_local_model_revision'],
+          repo_path=self.config['qwen_local_repo_path'],
+          code_revision=self.config['qwen_local_code_revision'],
           instruction=self.config['qwen_api_instruction'],
           dimension=self.config['sent_emb_dim'],
           batch_size=self.config['qwen_local_batch_size'],
