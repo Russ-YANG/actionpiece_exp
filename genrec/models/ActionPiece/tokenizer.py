@@ -27,6 +27,7 @@ import faiss
 from genrec.dataset import AbstractDataset
 from genrec.models.ActionPiece.core import ActionPieceCore
 from genrec.models.ActionPiece.qwen_api import QwenApiTextEncoder
+from genrec.models.ActionPiece.qwen_local import QwenLocalTextEncoder
 from genrec.tokenizer import AbstractTokenizer
 import numpy as np
 from PIL import Image
@@ -84,19 +85,37 @@ class ActionPieceTokenizer(AbstractTokenizer):
   def _sent_artifact_stem(self) -> str:
     """Return a cache-safe sentence encoder identity."""
     model_name = os.path.basename(self.config['sent_emb_model'])
-    if self.config['sent_emb_backend'] != 'qwen_api':
+    qwen_backends = {'qwen_api', 'qwen_local'}
+    if self.config['sent_emb_backend'] not in qwen_backends:
       return model_name
     safe_model_name = re.sub(r'[^A-Za-z0-9._-]+', '-', model_name)
     instruction_hash = hashlib.sha256(
         self.config['qwen_api_instruction'].encode('utf-8')
     ).hexdigest()[:12]
-    return (
-        f'qwen_api.{safe_model_name}.d{self.config["sent_emb_dim"]}.'
-        f'i{instruction_hash}'
+    stem = (
+        f'{self.config["sent_emb_backend"]}.{safe_model_name}.'
+        f'd{self.config["sent_emb_dim"]}.i{instruction_hash}'
     )
+    if self.config['sent_emb_backend'] == 'qwen_local':
+      revision = re.sub(
+          r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_model_revision']
+      )[:12]
+      dtype = re.sub(
+          r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_torch_dtype']
+      )
+      attention = re.sub(
+          r'[^A-Za-z0-9._-]+',
+          '-',
+          self.config['qwen_local_attn_implementation'],
+      )
+      stem += (
+          f'.r{revision}.m{self.config["qwen_local_max_length"]}.'
+          f't{dtype}.a{attention}'
+      )
+    return stem
 
   def _semantic_artifact_stem(self) -> str:
-    if self.config['sent_emb_backend'] != 'qwen_api':
+    if self.config['sent_emb_backend'] not in {'qwen_api', 'qwen_local'}:
       return self._sent_artifact_stem()
     return (
         f'{self._sent_artifact_stem()}.'
@@ -164,6 +183,31 @@ class ActionPieceTokenizer(AbstractTokenizer):
               '[TOKENIZER] Qwen text embeddings: %d/%d', completed, total
           ),
       )
+    elif self.config['sent_emb_backend'] == 'qwen_local':
+      if self.config['metadata'] != 'qwen_text':
+        raise ValueError('Local Qwen E1 requires metadata=qwen_text.')
+      if self.config['sent_emb_pca'] > 0:
+        raise ValueError('Local Qwen E1 does not support sent_emb_pca.')
+      encoder = QwenLocalTextEncoder(
+          model_path=self.config['qwen_local_model_path'],
+          model_id=self.config['sent_emb_model'],
+          model_revision=self.config['qwen_local_model_revision'],
+          instruction=self.config['qwen_api_instruction'],
+          dimension=self.config['sent_emb_dim'],
+          batch_size=self.config['qwen_local_batch_size'],
+          max_length=self.config['qwen_local_max_length'],
+          torch_dtype=self.config['qwen_local_torch_dtype'],
+          attn_implementation=self.config['qwen_local_attn_implementation'],
+          require_cuda=self.config['qwen_local_require_cuda'],
+      )
+      sent_embs = encoder.encode(
+          meta_sentences,
+          item_ids,
+          output_path,
+          progress_callback=lambda completed, total: self.logger.info(
+              '[TOKENIZER] Local Qwen text embeddings: %d/%d', completed, total
+          ),
+      )
     elif self.config['sent_emb_backend'] == 'sentence_transformers':
       sent_emb_model = SentenceTransformer(self.config['sent_emb_model']).to(
           self.config['device']
@@ -187,7 +231,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
       pca = PCA(n_components=self.config['sent_emb_pca'], whiten=True)
       sent_embs = pca.fit_transform(sent_embs)
 
-    if self.config['sent_emb_backend'] != 'qwen_api':
+    if self.config['sent_emb_backend'] not in {'qwen_api', 'qwen_local'}:
       sent_embs.tofile(output_path)
     return sent_embs
 

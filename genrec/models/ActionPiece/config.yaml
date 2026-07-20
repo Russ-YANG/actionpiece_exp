@@ -14,7 +14,7 @@
 # ==============================================================================
 
 # Config for sentence embedding model
-sent_emb_backend: sentence_transformers # sentence_transformers / qwen_api
+sent_emb_backend: sentence_transformers # sentence_transformers / qwen_api / qwen_local
 sent_emb_model: sentence-transformers/sentence-t5-base
 sent_emb_batch_size: 512
 sent_emb_dim: 768
@@ -30,6 +30,16 @@ qwen_api_instruction: >-
   Represent this e-commerce product for semantic similarity and sequential
   recommendation. Capture its category, function, attributes, style, and likely
   user intent.
+
+# Local Qwen3-VL encoder. Keep the canonical model ID separate from the local
+# path so cache names remain portable across machines.
+qwen_local_model_path: /root/autodl-tmp/models/Qwen3-VL-Embedding-8B
+qwen_local_model_revision: 2c4565515e0f265c6511776e7193b22c0968ddc7
+qwen_local_batch_size: 8
+qwen_local_max_length: 2048
+qwen_local_torch_dtype: bfloat16
+qwen_local_attn_implementation: sdpa
+qwen_local_require_cuda: true
 
 # Config for image embedding model, used when metadata=sentence_image or
 # metadata=sentence_image_fused

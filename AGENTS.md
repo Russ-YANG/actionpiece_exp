@@ -31,8 +31,16 @@ The main experimental comparison is among:
 The default checked-in configuration remains the text-only baseline unless an
 experiment intentionally changes it.
 
-The planned Qwen3-VL-Embedding ablation has five conditions. All semantic-code
-counts below exclude the collision-resolution hash feature:
+The full planned Beauty experiment matrix has seven conditions: one upstream
+baseline, five Qwen3-VL-Embedding ablations, and one CLIP alignment control.
+All semantic-code counts below exclude the collision-resolution hash feature.
+
+The upstream baseline is:
+
+0. Sentence-T5 text baseline: encode product text with
+   `sentence-transformers/sentence-t5-base`, then OPQ/PQ into four codes.
+
+The five Qwen3-VL-Embedding conditions are:
 
 1. Text only: text vector, then OPQ/PQ into four codes.
 2. Image only: image vector, then OPQ/PQ into four codes.
@@ -47,18 +55,41 @@ Conditions 4 and 5 must reuse the exact independently cached vectors from
 conditions 1 and 2; they are downstream transformations, not new encoder calls.
 Keep output dimension and prompt/instruction policy fixed across conditions.
 
-E1 is configured in `experiments/e1_qwen_text_beauty.yaml` and uses the
-dedicated `metadata=qwen_text` cache namespace. Run its Mac tokenizer stage
-with:
+The CLIP alignment control is:
+
+6. CLIP aligned continuous fusion: encode product text with the CLIP text
+   encoder and its image with the paired CLIP image encoder, normalize and
+   concatenate the two 512-dimensional vectors, then train one OPQ/PQ on the
+   fused vectors and produce four codes. This keeps the recommendation target
+   length equal to the text-only baseline while replacing the current
+   independently distributed Sentence-T5 and CLIP inputs with paired encoders
+   trained in CLIP's shared contrastive space.
+
+Condition 6 must use the same CLIP checkpoint for both encoders, the same
+catalog text and images used by the other conditions, the same train-item set
+for quantizer fitting, and the same four-code PQ settings. The eight-code CLIP
+late-fusion controls are deferred. Condition 6 is not implemented yet; add a
+dedicated metadata mode and cache names before running it so it cannot reuse
+the existing Sentence-T5/CLIP fusion artifacts.
+
+The active E1 uses the explicit open-weight `Qwen/Qwen3-VL-Embedding-8B`
+checkpoint at revision `2c4565515e0f265c6511776e7193b22c0968ddc7`, not the
+parameter-undisclosed DashScope API model. It emits 768-dimensional,
+L2-normalized MRL prefixes with the shared English instruction, a maximum input
+length of 2048 tokens, and uses SDPA in bfloat16. It is configured in
+`experiments/e1_qwen3_vl_8b_text_beauty.yaml` and has a dedicated local-backend
+cache identity. Run its tokenizer-only stage on the RTX PRO 6000 with:
 
 ```bash
-python main.py --config_file=experiments/e1_qwen_text_beauty.yaml
+python main.py --config_file=experiments/e1_qwen3_vl_8b_text_beauty.yaml
 ```
 
-The Qwen API encoder writes item-aligned batches to a `.partial` file and
-commits progress after each successful request. The final `.sent_emb` filename
-appears only after every item is encoded. Do not delete the partial, progress,
-or request-log artifacts when resuming an interrupted run.
+The previous API-based E1 remains in `experiments/e1_qwen_text_beauty.yaml` for
+provenance only and must not be mixed with the local-8B run. Both Qwen encoders
+write item-aligned batches to a `.partial` file and commit progress after each
+successful batch. The final `.sent_emb` filename appears only after every item
+is encoded. Do not delete partial or progress artifacts when resuming an
+interrupted run.
 
 ## Current implementation
 
@@ -89,6 +120,8 @@ or request-log artifacts when resuming an interrupted run.
   merge logging.
 - `genrec/models/ActionPiece/tokenizer.py`: text/image encoding, quantization,
   fused features, tokenizer caching, and collation.
+- `genrec/models/ActionPiece/qwen_local.py`: resumable local Qwen3-VL text
+  embedding, MRL truncation, normalization, and provenance manifest.
 - `genrec/models/ActionPiece/model.py`: recommendation model and generation.
 - `scripts/analyze_modality_merges.py`: summarizes text-only, image-only,
   cross-modal, and hash-containing merge events.
@@ -127,19 +160,22 @@ and must be treated as a separate prompt/preprocessing ablation.
 
 ## Two-stage compute workflow
 
-The intended experiment workflow is split across machines:
+The intended experiment workflow is split into two artifact boundaries:
 
-1. MacBook: prepare/cache inputs and embeddings, train OPQ/PQ, build semantic
-   IDs, construct the ActionPiece vocabulary, and analyze merge logs. These
-   artifacts must be deterministic and portable.
-2. RTX 5090 machine: train the recommendation model and run validation/test
-   evaluation from the frozen tokenizer and feature artifacts.
+1. Tokenizer-only stage: prepare/cache inputs and embeddings, train OPQ/PQ,
+   build semantic IDs, construct the ActionPiece vocabulary, and analyze merge
+   logs. API-derived embeddings can be built on the MacBook; the explicit local
+   Qwen3-VL-Embedding-8B encoder runs on the RTX PRO 6000. These artifacts must
+   be deterministic and portable.
+2. Recommendation stage: train the recommendation model and run
+   validation/test evaluation on a GPU machine from the frozen tokenizer and
+   feature artifacts.
 
 Do not start a full embedding, OPQ/PQ, ActionPiece merge, training, or evaluation
 run without first presenting the expected API calls/cost and outputs to the
-user and receiving explicit approval. On the MacBook, stop after producing and
-validating semantic IDs, the ActionPiece tokenizer vocabulary, and merge logs;
-do not run the GPU recommendation-model stage.
+user and receiving explicit approval. For a tokenizer-only run, stop after
+producing and validating semantic IDs, the ActionPiece tokenizer vocabulary,
+and merge logs; do not continue into recommendation-model training.
 
 Before transferring artifacts, save the full resolved configuration, model
 identifier or API model name, prompt/instruction text, embedding dimension,
