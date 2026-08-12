@@ -19,7 +19,7 @@ qwen_local_max_length: 2048
 qwen_local_torch_dtype: bfloat16
 qwen_local_attn_implementation: sdpa
 qwen_local_require_cuda: true
-qwen_local_image_manifest_sha256: ~ # Fill from ninerec_summary.json.
+qwen_local_image_manifest_sha256: 69d00cd14aa3756ae991259380b21a44984a12a81956901df2b0331f66436e29
 pq_n_codebooks: 4
 pq_codebook_size: 256
 n_threads: 8

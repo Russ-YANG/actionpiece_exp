@@ -225,7 +225,9 @@ def _image_index(cover_dir: Path | None) -> dict[str, Path]:
           f'Multiple cover images found for item {item!r}: '
           f'{images[item]} and {path}.'
       )
-    images[item] = path.resolve()
+    # Preserve relative source paths so a self-contained cache can be moved to
+    # the training machine without embedding this computer's absolute path.
+    images[item] = path
   return images
 
 

@@ -23,7 +23,7 @@ qwen_local_max_length: 2048
 qwen_local_torch_dtype: bfloat16
 qwen_local_attn_implementation: sdpa
 qwen_local_require_cuda: true
-qwen_local_image_manifest_sha256: ~ # Fill from ninerec_summary.json.
+qwen_local_image_manifest_sha256: 69d00cd14aa3756ae991259380b21a44984a12a81956901df2b0331f66436e29
 image_emb_model: Qwen/Qwen3-VL-Embedding-8B
 image_emb_dim: 768
 fused_image_weight: 1.0

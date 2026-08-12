@@ -6,7 +6,10 @@ NineRec data.
 
 ## Prepare DY
 
-Point `--source-dir` at a directory containing:
+Place or extract the official subset under `cache/NineRec/DY/raw/`, then point
+`--source-dir` at that directory. Keeping the raw files inside the dataset
+cache makes the relative cover paths portable to a training machine. The
+directory should contain:
 
 ```text
 DY_behaviour.tsv       # preferred when present
@@ -21,7 +24,7 @@ Run:
 ```bash
 python scripts/prepare_ninerec_data.py \
   --subset DY \
-  --source-dir /path/to/official/DY \
+  --source-dir cache/NineRec/DY/raw \
   --text-language bilingual \
   --require-all-images
 ```
