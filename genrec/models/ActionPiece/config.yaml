@@ -42,14 +42,21 @@ qwen_local_max_length: 2048
 qwen_local_torch_dtype: bfloat16
 qwen_local_attn_implementation: sdpa
 qwen_local_require_cuda: true
+qwen_local_image_manifest_sha256: ~ # Required for metadata=qwen_multimodal
+qwen_local_image_instruction: >-
+  Represent this e-commerce product image for semantic similarity and
+  sequential recommendation. Capture its visible category, function,
+  attributes, style, packaging, and likely user intent.
 
-# Config for image embedding model, used when metadata=sentence_image or
-# metadata=sentence_image_fused
+# Config for image embedding model. Qwen image embeddings are used when
+# metadata=qwen_separate or metadata=qwen_fused; the sentence_image modes use
+# CLIP.
 image_emb_model: openai/clip-vit-base-patch32
 image_emb_batch_size: 64
 image_emb_dim: 512
 image_download_timeout: 10
 fused_image_weight: 1.0
+fused_final_normalize: False
 
 # Config for features
 n_threads: 32

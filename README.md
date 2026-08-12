@@ -50,6 +50,38 @@ CUDA_VISIBLE_DEVICES=0 python main.py \
   --run_id=beauty_e1_qwen3_vl_8b_train
 ```
 
+## Run E4
+
+E4 reuses the aligned 768D Qwen text and image embedding caches, trains a
+separate OPQ4 index for each modality, concatenates the resulting codes into
+eight slots, and then learns the ActionPiece vocabulary. Build only the frozen
+tokenizer artifacts with:
+
+```bash
+python main.py \
+  --config_file=experiments/e4_qwen3_vl_8b_separate_opq_beauty.yaml
+```
+
+After the tokenizer-only run completes, summarize text-text, image-image, and
+cross-modal merges (including frequency weights and merge-stage trends) with:
+
+```bash
+python scripts/analyze_modality_merges.py \
+  cache/AmazonReviews2014/Beauty/processed/actionpiece.qwen_separate.Qwen3-VL-Embedding-8B.t768.th53fe43ac7a78.i768.ihe8d8f4d4b3a1.topq4x256.iopq4x256.seed2024.h128.v40000.merge_log.jsonl \
+  --text-slots 4 \
+  --image-slots 4 \
+  --hash-slot 8 \
+  --bins 10 \
+  --json-output results/e4_merge_modality_summary.json
+```
+
+Train the recommendation model only from the completed frozen E4 cache:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python main.py \
+  --config_file=experiments/e4_qwen3_vl_8b_separate_opq_beauty_train.yaml
+```
+
 Generated datasets, model weights, embeddings, tokenizers, checkpoints, and
 logs are intentionally excluded from Git. A transferred E1 cache must retain
 its original directory structure under
@@ -65,6 +97,9 @@ artifacts from a different encoder configuration.
 - Independently encoded text and image vectors concatenated before four-code
   OPQ/PQ.
 - A paired CLIP text-image alignment control.
+
+Current findings, open hypotheses, and the corresponding validation plans are
+tracked in [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
 
 ## Origin and license
 

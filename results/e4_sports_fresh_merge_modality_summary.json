@@ -1,0 +1,812 @@
+{
+  "total_merge_events": 37695,
+  "max_step": 37695,
+  "slots": {
+    "text": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "image": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "hash": 8
+  },
+  "output_composition": {
+    "rule_counts": {
+      "text_image": 23520,
+      "text_only": 6634,
+      "image_only": 7541
+    },
+    "priority_weights": {
+      "text_image": 1376076.2238791361,
+      "text_only": 439255.71425280505,
+      "image_only": 390640.47201782715
+    },
+    "affected_sequence_weights": {
+      "text_image": 4448402.0,
+      "text_only": 1649240.0,
+      "image_only": 1280846.0
+    },
+    "includes_hash_count": 8185
+  },
+  "operand_transitions": {
+    "rule_counts": {
+      "text_image": 13863,
+      "text_text": 4613,
+      "mixed_text": 2262,
+      "image_image": 4736,
+      "mixed_image": 3393,
+      "mixed_mixed": 643,
+      "hash_related": 8185
+    },
+    "priority_weights": {
+      "text_image": 863469.8556039032,
+      "text_text": 360405.5921478979,
+      "mixed_text": 135528.40719954637,
+      "image_image": 275601.00829821796,
+      "mixed_image": 191250.51917989482,
+      "mixed_mixed": 31539.628857709762,
+      "hash_related": 348177.3988625908
+    },
+    "affected_sequence_weights": {
+      "text_image": 3275245.0,
+      "text_text": 1390873.0,
+      "mixed_text": 384826.0,
+      "image_image": 981342.0,
+      "mixed_image": 477219.0,
+      "mixed_mixed": 66907.0,
+      "hash_related": 802076.0
+    },
+    "first_steps": {
+      "text_image": 1,
+      "text_text": 2,
+      "mixed_text": 4,
+      "image_image": 5,
+      "mixed_image": 10,
+      "mixed_mixed": 34,
+      "hash_related": 119
+    },
+    "unresolved_operands": 0,
+    "examples": {
+      "text_image": [
+        {
+          "step": 1,
+          "new_token": 2305,
+          "merged_tokens": [
+            632,
+            1909
+          ],
+          "features": [
+            [
+              2,
+              119
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        },
+        {
+          "step": 8,
+          "new_token": 2312,
+          "merged_tokens": [
+            335,
+            1909
+          ],
+          "features": [
+            [
+              1,
+              78
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        },
+        {
+          "step": 11,
+          "new_token": 2315,
+          "merged_tokens": [
+            239,
+            1909
+          ],
+          "features": [
+            [
+              0,
+              238
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        }
+      ],
+      "text_text": [
+        {
+          "step": 2,
+          "new_token": 2306,
+          "merged_tokens": [
+            72,
+            294
+          ],
+          "features": [
+            [
+              0,
+              71
+            ],
+            [
+              1,
+              37
+            ]
+          ]
+        },
+        {
+          "step": 3,
+          "new_token": 2307,
+          "merged_tokens": [
+            335,
+            632
+          ],
+          "features": [
+            [
+              1,
+              78
+            ],
+            [
+              2,
+              119
+            ]
+          ]
+        },
+        {
+          "step": 7,
+          "new_token": 2311,
+          "merged_tokens": [
+            80,
+            566
+          ],
+          "features": [
+            [
+              0,
+              79
+            ],
+            [
+              2,
+              53
+            ]
+          ]
+        }
+      ],
+      "mixed_text": [
+        {
+          "step": 4,
+          "new_token": 2308,
+          "merged_tokens": [
+            239,
+            2305
+          ],
+          "features": [
+            [
+              0,
+              238
+            ],
+            [
+              2,
+              119
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        },
+        {
+          "step": 6,
+          "new_token": 2310,
+          "merged_tokens": [
+            335,
+            2305
+          ],
+          "features": [
+            [
+              1,
+              78
+            ],
+            [
+              2,
+              119
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        },
+        {
+          "step": 24,
+          "new_token": 2328,
+          "merged_tokens": [
+            898,
+            2305
+          ],
+          "features": [
+            [
+              3,
+              129
+            ],
+            [
+              2,
+              119
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        }
+      ],
+      "image_image": [
+        {
+          "step": 5,
+          "new_token": 2309,
+          "merged_tokens": [
+            1119,
+            1975
+          ],
+          "features": [
+            [
+              4,
+              94
+            ],
+            [
+              7,
+              182
+            ]
+          ]
+        },
+        {
+          "step": 12,
+          "new_token": 2316,
+          "merged_tokens": [
+            1117,
+            1440
+          ],
+          "features": [
+            [
+              4,
+              92
+            ],
+            [
+              5,
+              159
+            ]
+          ]
+        },
+        {
+          "step": 19,
+          "new_token": 2323,
+          "merged_tokens": [
+            1668,
+            1909
+          ],
+          "features": [
+            [
+              6,
+              131
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        }
+      ],
+      "mixed_image": [
+        {
+          "step": 10,
+          "new_token": 2314,
+          "merged_tokens": [
+            1668,
+            2305
+          ],
+          "features": [
+            [
+              6,
+              131
+            ],
+            [
+              2,
+              119
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        },
+        {
+          "step": 71,
+          "new_token": 2375,
+          "merged_tokens": [
+            1668,
+            2308
+          ],
+          "features": [
+            [
+              6,
+              131
+            ],
+            [
+              0,
+              238
+            ],
+            [
+              2,
+              119
+            ],
+            [
+              7,
+              116
+            ]
+          ]
+        },
+        {
+          "step": 79,
+          "new_token": 2383,
+          "merged_tokens": [
+            1639,
+            2336
+          ],
+          "features": [
+            [
+              6,
+              102
+            ],
+            [
+              1,
+              12
+            ],
+            [
+              0,
+              79
+            ],
+            [
+              2,
+              53
+            ],
+            [
+              4,
+              170
+            ],
+            [
+              7,
+              196
+            ]
+          ]
+        }
+      ],
+      "mixed_mixed": [
+        {
+          "step": 34,
+          "new_token": 2338,
+          "merged_tokens": [
+            2336,
+            2337
+          ],
+          "features": [
+            [
+              1,
+              12
+            ],
+            [
+              0,
+              79
+            ],
+            [
+              2,
+              53
+            ],
+            [
+              4,
+              170
+            ],
+            [
+              7,
+              196
+            ],
+            [
+              3,
+              191
+            ],
+            [
+              6,
+              102
+            ]
+          ]
+        },
+        {
+          "step": 202,
+          "new_token": 2506,
+          "merged_tokens": [
+            2504,
+            2505
+          ],
+          "features": [
+            [
+              0,
+              251
+            ],
+            [
+              2,
+              243
+            ],
+            [
+              3,
+              180
+            ],
+            [
+              7,
+              66
+            ],
+            [
+              4,
+              251
+            ],
+            [
+              1,
+              99
+            ],
+            [
+              6,
+              1
+            ]
+          ]
+        },
+        {
+          "step": 203,
+          "new_token": 2507,
+          "merged_tokens": [
+            2502,
+            2504
+          ],
+          "features": [
+            [
+              1,
+              99
+            ],
+            [
+              6,
+              1
+            ],
+            [
+              0,
+              251
+            ],
+            [
+              2,
+              243
+            ],
+            [
+              3,
+              180
+            ],
+            [
+              7,
+              66
+            ]
+          ]
+        }
+      ],
+      "hash_related": [
+        {
+          "step": 119,
+          "new_token": 2423,
+          "merged_tokens": [
+            2281,
+            2422
+          ],
+          "features": [
+            [
+              8,
+              232
+            ],
+            [
+              5,
+              223
+            ],
+            [
+              6,
+              217
+            ],
+            [
+              2,
+              44
+            ],
+            [
+              1,
+              164
+            ],
+            [
+              0,
+              9
+            ],
+            [
+              3,
+              93
+            ],
+            [
+              4,
+              255
+            ],
+            [
+              7,
+              107
+            ]
+          ]
+        },
+        {
+          "step": 120,
+          "new_token": 2424,
+          "merged_tokens": [
+            2281,
+            2420
+          ],
+          "features": [
+            [
+              8,
+              232
+            ],
+            [
+              5,
+              223
+            ],
+            [
+              6,
+              217
+            ]
+          ]
+        },
+        {
+          "step": 121,
+          "new_token": 2425,
+          "merged_tokens": [
+            2281,
+            2421
+          ],
+          "features": [
+            [
+              8,
+              232
+            ],
+            [
+              2,
+              44
+            ],
+            [
+              1,
+              164
+            ],
+            [
+              0,
+              9
+            ],
+            [
+              3,
+              93
+            ],
+            [
+              4,
+              255
+            ],
+            [
+              7,
+              107
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "phases": [
+    {
+      "bin": 1,
+      "step_start": 1,
+      "step_end": 3769,
+      "rule_counts": {
+        "text_image": 1678,
+        "text_text": 839,
+        "mixed_related": 558,
+        "image_image": 493,
+        "hash_related": 202
+      },
+      "priority_weights": {
+        "text_image": 318189.69321255566,
+        "text_text": 169286.4928499009,
+        "mixed_related": 111201.18936413448,
+        "image_image": 96004.12988111064,
+        "hash_related": 39161.87440901368
+      }
+    },
+    {
+      "bin": 2,
+      "step_start": 3770,
+      "step_end": 7539,
+      "rule_counts": {
+        "text_image": 1549,
+        "mixed_related": 598,
+        "text_text": 750,
+        "hash_related": 425,
+        "image_image": 447
+      },
+      "priority_weights": {
+        "text_image": 140333.3338137759,
+        "mixed_related": 54541.71653864328,
+        "text_text": 68927.3355801211,
+        "hash_related": 40371.9814030612,
+        "image_image": 40609.04662808649
+      }
+    },
+    {
+      "bin": 3,
+      "step_start": 7540,
+      "step_end": 11308,
+      "rule_counts": {
+        "mixed_related": 646,
+        "text_image": 1549,
+        "text_text": 547,
+        "hash_related": 583,
+        "image_image": 445
+      },
+      "priority_weights": {
+        "mixed_related": 41930.63339947094,
+        "text_image": 98695.08322751313,
+        "text_text": 35094.19514424289,
+        "hash_related": 39091.62308453003,
+        "image_image": 28332.88117189461
+      }
+    },
+    {
+      "bin": 4,
+      "step_start": 11309,
+      "step_end": 15078,
+      "rule_counts": {
+        "text_image": 1404,
+        "image_image": 482,
+        "hash_related": 723,
+        "text_text": 498,
+        "mixed_related": 662
+      },
+      "priority_weights": {
+        "text_image": 70044.68799933858,
+        "image_image": 24092.755855694082,
+        "hash_related": 37701.44360245018,
+        "text_text": 24964.16259117535,
+        "mixed_related": 33313.97235071803
+      }
+    },
+    {
+      "bin": 5,
+      "step_start": 15079,
+      "step_end": 18847,
+      "rule_counts": {
+        "text_image": 1436,
+        "image_image": 444,
+        "mixed_related": 627,
+        "text_text": 412,
+        "hash_related": 851
+      },
+      "priority_weights": {
+        "text_image": 59047.48108875025,
+        "image_image": 18344.886933263995,
+        "mixed_related": 26114.880833333318,
+        "text_text": 17029.314790879285,
+        "hash_related": 36619.974402399836
+      }
+    },
+    {
+      "bin": 6,
+      "step_start": 18848,
+      "step_end": 22617,
+      "rule_counts": {
+        "mixed_related": 656,
+        "text_image": 1325,
+        "image_image": 478,
+        "text_text": 387,
+        "hash_related": 923
+      },
+      "priority_weights": {
+        "mixed_related": 23223.505238095204,
+        "text_image": 46725.073910147315,
+        "image_image": 16824.7572678886,
+        "text_text": 13662.138390180135,
+        "hash_related": 33775.33268250816
+      }
+    },
+    {
+      "bin": 7,
+      "step_start": 22618,
+      "step_end": 26386,
+      "rule_counts": {
+        "hash_related": 1040,
+        "text_text": 323,
+        "text_image": 1285,
+        "image_image": 486,
+        "mixed_related": 636
+      },
+      "priority_weights": {
+        "hash_related": 33063.326436444964,
+        "text_text": 9958.890165816307,
+        "text_image": 39588.602766754775,
+        "image_image": 14948.90579365078,
+        "mixed_related": 19671.752309618238
+      }
+    },
+    {
+      "bin": 8,
+      "step_start": 26387,
+      "step_end": 30156,
+      "rule_counts": {
+        "text_text": 312,
+        "mixed_related": 650,
+        "hash_related": 1090,
+        "text_image": 1232,
+        "image_image": 485
+      },
+      "priority_weights": {
+        "text_text": 8554.665206601137,
+        "mixed_related": 18089.678166099777,
+        "hash_related": 31148.536318027214,
+        "text_image": 33746.42988819597,
+        "image_image": 13308.361467151652
+      }
+    },
+    {
+      "bin": 9,
+      "step_start": 30157,
+      "step_end": 33925,
+      "rule_counts": {
+        "hash_related": 1150,
+        "text_image": 1221,
+        "mixed_related": 645,
+        "text_text": 268,
+        "image_image": 486
+      },
+      "priority_weights": {
+        "hash_related": 29413.65435011967,
+        "text_image": 30347.9569657029,
+        "mixed_related": 16084.282488189685,
+        "text_text": 6652.8136534706355,
+        "image_image": 12058.96700113378
+      }
+    },
+    {
+      "bin": 10,
+      "step_start": 33926,
+      "step_end": 37695,
+      "rule_counts": {
+        "text_image": 1184,
+        "image_image": 490,
+        "text_text": 277,
+        "hash_related": 1198,
+        "mixed_related": 620
+      },
+      "priority_weights": {
+        "text_image": 26751.51273116649,
+        "image_image": 11076.316298343385,
+        "text_text": 6275.583775510196,
+        "hash_related": 27829.652174036248,
+        "mixed_related": 14146.944548847325
+      }
+    }
+  ],
+  "log_path": "cache/fresh_sports_e4/AmazonReviews2014/Sports_and_Outdoors/processed/actionpiece.qwen_separate.Qwen3-VL-Embedding-8B.t768.th53fe43ac7a78.i768.ihaad8113ca8ad.topq4x256.iopq4x256.seed2024.h256.v40000.merge_log.jsonl",
+  "malformed_records": 0
+}

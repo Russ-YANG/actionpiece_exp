@@ -20,13 +20,19 @@ import hashlib
 import io
 import json
 import os
+from pathlib import Path
 import re
 from typing import Any
 
 import faiss
 from genrec.dataset import AbstractDataset
+from genrec.image_manifest import available_image_path
+from genrec.image_manifest import load_image_manifest
+from genrec.image_manifest import sha256_file
 from genrec.models.ActionPiece.core import ActionPieceCore
 from genrec.models.ActionPiece.qwen_api import QwenApiTextEncoder
+from genrec.models.ActionPiece.qwen_local import build_qwen_local_artifact_stem
+from genrec.models.ActionPiece.qwen_local import QwenLocalMultimodalEncoder
 from genrec.models.ActionPiece.qwen_local import QwenLocalTextEncoder
 from genrec.tokenizer import AbstractTokenizer
 import numpy as np
@@ -97,24 +103,27 @@ class ActionPieceTokenizer(AbstractTokenizer):
         f'd{self.config["sent_emb_dim"]}.i{instruction_hash}'
     )
     if self.config['sent_emb_backend'] == 'qwen_local':
-      revision = re.sub(
-          r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_model_revision']
-      )[:12]
-      code_revision = re.sub(
-          r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_code_revision']
-      )[:12]
-      dtype = re.sub(
-          r'[^A-Za-z0-9._-]+', '-', self.config['qwen_local_torch_dtype']
+      modality = (
+          'text_image_joint'
+          if self.config['metadata'] == 'qwen_multimodal'
+          else 'text'
       )
-      attention = re.sub(
-          r'[^A-Za-z0-9._-]+',
-          '-',
-          self.config['qwen_local_attn_implementation'],
-      )
-      stem += (
-          f'.r{revision}.c{code_revision}.'
-          f'm{self.config["qwen_local_max_length"]}.'
-          f't{dtype}.a{attention}'
+      return build_qwen_local_artifact_stem(
+          backend=self.config['sent_emb_backend'],
+          model_id=self.config['sent_emb_model'],
+          dimension=self.config['sent_emb_dim'],
+          instruction=self.config['qwen_api_instruction'],
+          model_revision=self.config['qwen_local_model_revision'],
+          code_revision=self.config['qwen_local_code_revision'],
+          max_length=self.config['qwen_local_max_length'],
+          torch_dtype=self.config['qwen_local_torch_dtype'],
+          attn_implementation=self.config['qwen_local_attn_implementation'],
+          modality=modality,
+          image_manifest_sha256=(
+              self.config['qwen_local_image_manifest_sha256']
+              if modality == 'text_image_joint'
+              else None
+          ),
       )
     return stem
 
@@ -128,11 +137,82 @@ class ActionPieceTokenizer(AbstractTokenizer):
         f'seed{self.config["rand_seed"]}'
     )
 
+  def _qwen_image_artifact_stem(self) -> str:
+    return build_qwen_local_artifact_stem(
+        backend=self.config['sent_emb_backend'],
+        model_id=self.config['sent_emb_model'],
+        dimension=self.config['image_emb_dim'],
+        instruction=self.config['qwen_local_image_instruction'],
+        model_revision=self.config['qwen_local_model_revision'],
+        code_revision=self.config['qwen_local_code_revision'],
+        max_length=self.config['qwen_local_max_length'],
+        torch_dtype=self.config['qwen_local_torch_dtype'],
+        attn_implementation=self.config['qwen_local_attn_implementation'],
+        modality='image',
+        image_manifest_sha256=self.config[
+            'qwen_local_image_manifest_sha256'
+        ],
+    )
+
+  def _fused_semantic_artifact_stem(self) -> str:
+    image_weight = self.config['fused_image_weight']
+    text_identity = hashlib.sha256(
+        self._sent_artifact_stem().encode('utf-8')
+    ).hexdigest()[:12]
+    image_identity = hashlib.sha256(
+        self._qwen_image_artifact_stem().encode('utf-8')
+    ).hexdigest()[:12]
+    return (
+        f'qwen_fused.{os.path.basename(self.config["sent_emb_model"])}.'
+        f't{self.config["sent_emb_dim"]}.th{text_identity}.'
+        f'i{self.config["image_emb_dim"]}.ih{image_identity}.'
+        f'w{image_weight}.'
+        f'opq{self.config["pq_n_codebooks"]}x'
+        f'{self.config["pq_codebook_size"]}.'
+        f'seed{self.config["rand_seed"]}'
+    )
+
+  def _image_semantic_artifact_stem(self) -> str:
+    """Return a cache-safe identity for independently quantized images."""
+    return (
+        f'{self._qwen_image_artifact_stem()}.'
+        f'opq{self.config["image_pq_n_codebooks"]}x'
+        f'{self.config["image_pq_codebook_size"]}.'
+        f'seed{self.config["rand_seed"]}'
+    )
+
+  def _separate_feature_artifact_stem(self) -> str:
+    """Return the E4 identity without creating overlong cache filenames."""
+    text_identity = hashlib.sha256(
+        self._semantic_artifact_stem().encode('utf-8')
+    ).hexdigest()[:12]
+    image_identity = hashlib.sha256(
+        self._image_semantic_artifact_stem().encode('utf-8')
+    ).hexdigest()[:12]
+    return (
+        f'qwen_separate.{os.path.basename(self.config["sent_emb_model"])}.'
+        f't{self.config["sent_emb_dim"]}.th{text_identity}.'
+        f'i{self.config["image_emb_dim"]}.ih{image_identity}.'
+        f'topq{self.config["pq_n_codebooks"]}x'
+        f'{self.config["pq_codebook_size"]}.'
+        f'iopq{self.config["image_pq_n_codebooks"]}x'
+        f'{self.config["image_pq_codebook_size"]}.'
+        f'seed{self.config["rand_seed"]}.'
+        f'h{self.config["n_hash_buckets"]}'
+    )
+
   def _feature_artifact_stem(self) -> str:
-    if self.config['metadata'] != 'qwen_text':
+    if self.config['metadata'] == 'qwen_separate':
+      return self._separate_feature_artifact_stem()
+    if self.config['metadata'] == 'qwen_fused':
+      return (
+          f'{self._fused_semantic_artifact_stem()}.'
+          f'h{self.config["n_hash_buckets"]}'
+      )
+    if self.config['metadata'] not in {'qwen_text', 'qwen_multimodal'}:
       return self.config['metadata']
     return (
-        f'qwen_text.{self._semantic_artifact_stem()}.'
+        f'{self.config["metadata"]}.{self._semantic_artifact_stem()}.'
         f'h{self.config["n_hash_buckets"]}'
     )
 
@@ -150,6 +230,9 @@ class ActionPieceTokenizer(AbstractTokenizer):
     assert self.config['metadata'] in [
         'sentence',
         'qwen_text',
+        'qwen_multimodal',
+        'qwen_separate',
+        'qwen_fused',
         'all',
         'sentence_image',
         'sentence_image_fused',
@@ -188,11 +271,24 @@ class ActionPieceTokenizer(AbstractTokenizer):
           ),
       )
     elif self.config['sent_emb_backend'] == 'qwen_local':
-      if self.config['metadata'] != 'qwen_text':
-        raise ValueError('Local Qwen E1 requires metadata=qwen_text.')
+      if self.config['metadata'] not in {
+          'qwen_text',
+          'qwen_multimodal',
+          'qwen_separate',
+          'qwen_fused',
+      }:
+        raise ValueError(
+            'Local Qwen requires metadata=qwen_text, qwen_multimodal, '
+            'qwen_separate, or qwen_fused.'
+        )
       if self.config['sent_emb_pca'] > 0:
-        raise ValueError('Local Qwen E1 does not support sent_emb_pca.')
-      encoder = QwenLocalTextEncoder(
+        raise ValueError('Local Qwen does not support sent_emb_pca.')
+      encoder_class = (
+          QwenLocalMultimodalEncoder
+          if self.config['metadata'] == 'qwen_multimodal'
+          else QwenLocalTextEncoder
+      )
+      encoder = encoder_class(
           model_path=self.config['qwen_local_model_path'],
           model_id=self.config['sent_emb_model'],
           model_revision=self.config['qwen_local_model_revision'],
@@ -206,14 +302,52 @@ class ActionPieceTokenizer(AbstractTokenizer):
           attn_implementation=self.config['qwen_local_attn_implementation'],
           require_cuda=self.config['qwen_local_require_cuda'],
       )
-      sent_embs = encoder.encode(
-          meta_sentences,
-          item_ids,
-          output_path,
-          progress_callback=lambda completed, total: self.logger.info(
-              '[TOKENIZER] Local Qwen text embeddings: %d/%d', completed, total
-          ),
-      )
+      if self.config['metadata'] == 'qwen_multimodal':
+        manifest_path = os.path.join(
+            dataset.cache_dir, 'processed', 'image_download_manifest.jsonl'
+        )
+        manifest_path = Path(manifest_path)
+        expected_manifest_sha256 = self.config.get(
+            'qwen_local_image_manifest_sha256'
+        )
+        actual_manifest_sha256 = sha256_file(manifest_path)
+        if actual_manifest_sha256 != expected_manifest_sha256:
+          raise RuntimeError(
+              'Image manifest SHA-256 mismatch: '
+              f'got {actual_manifest_sha256}, '
+              f'expected {expected_manifest_sha256}.'
+          )
+        image_status = load_image_manifest(manifest_path)
+        if set(image_status) != set(item_ids):
+          raise RuntimeError(
+              'Image manifest keys do not exactly match the dataset item IDs.'
+          )
+        image_paths = [
+            available_image_path(image_status[item]) for item in item_ids
+        ]
+        sent_embs = encoder.encode(
+            meta_sentences,
+            image_paths,
+            item_ids,
+            output_path,
+            image_manifest_sha256=self.config[
+                'qwen_local_image_manifest_sha256'
+            ],
+            progress_callback=lambda completed, total: self.logger.info(
+                '[TOKENIZER] Local Qwen joint embeddings: %d/%d',
+                completed,
+                total,
+            ),
+        )
+      else:
+        sent_embs = encoder.encode(
+            meta_sentences,
+            item_ids,
+            output_path,
+            progress_callback=lambda completed, total: self.logger.info(
+                '[TOKENIZER] Local Qwen text embeddings: %d/%d', completed, total
+            ),
+        )
     elif self.config['sent_emb_backend'] == 'sentence_transformers':
       sent_emb_model = SentenceTransformer(self.config['sent_emb_model']).to(
           self.config['device']
@@ -385,11 +519,24 @@ class ActionPieceTokenizer(AbstractTokenizer):
     return image_embs
 
   def _get_image_embs(self, dataset: AbstractDataset) -> np.ndarray:
-    image_emb_path = os.path.join(
-        dataset.cache_dir,
-        'processed',
-        f'{os.path.basename(self.config["image_emb_model"])}.image_emb',
-    )
+    if self.config['metadata'] in {'qwen_separate', 'qwen_fused'}:
+      image_emb_path = os.path.join(
+          dataset.cache_dir,
+          'processed',
+          f'{self._qwen_image_artifact_stem()}.image_emb',
+      )
+      if not os.path.exists(image_emb_path):
+        raise FileNotFoundError(
+            'Qwen image-only embeddings are missing. Run '
+            'scripts/generate_qwen_local_image_embeddings.py first: '
+            f'{image_emb_path}'
+        )
+    else:
+      image_emb_path = os.path.join(
+          dataset.cache_dir,
+          'processed',
+          f'{os.path.basename(self.config["image_emb_model"])}.image_emb',
+      )
     image_emb_dim = self.config['image_emb_dim']
     if os.path.exists(image_emb_path):
       self.logger.info(
@@ -517,10 +664,14 @@ class ActionPieceTokenizer(AbstractTokenizer):
     )
 
   def _get_image_sem_ids(self, dataset: AbstractDataset) -> dict[Any, Any]:
+    if self.config['metadata'] == 'qwen_separate':
+      image_sem_ids_filename = f'{self._image_semantic_artifact_stem()}.sem_ids'
+    else:
+      image_sem_ids_filename = (
+          f'{os.path.basename(self.config["image_emb_model"])}.image_sem_ids'
+      )
     image_sem_ids_path = os.path.join(
-        dataset.cache_dir,
-        'processed',
-        f'{os.path.basename(self.config["image_emb_model"])}.image_sem_ids',
+        dataset.cache_dir, 'processed', image_sem_ids_filename
     )
     if not os.path.exists(image_sem_ids_path):
       self.logger.info(
@@ -550,16 +701,18 @@ class ActionPieceTokenizer(AbstractTokenizer):
     return embs / norms
 
   def _get_fused_sem_ids(self, dataset: AbstractDataset) -> dict[Any, Any]:
-    sent_model_name = os.path.basename(self.config['sent_emb_model'])
-    image_model_name = os.path.basename(self.config['image_emb_model'])
     image_weight = self.config['fused_image_weight']
+    if self.config['metadata'] == 'qwen_fused':
+      fused_filename = f'{self._fused_semantic_artifact_stem()}.sem_ids'
+    else:
+      sent_model_name = os.path.basename(self.config['sent_emb_model'])
+      image_model_name = os.path.basename(self.config['image_emb_model'])
+      fused_filename = (
+          f'{sent_model_name}.{image_model_name}.'
+          f'w{image_weight}.fused_sem_ids'
+      )
     fused_sem_ids_path = os.path.join(
-        dataset.cache_dir,
-        'processed',
-        (
-            f'{sent_model_name}.{image_model_name}.'
-            f'w{image_weight}.fused_sem_ids'
-        ),
+        dataset.cache_dir, 'processed', fused_filename
     )
     if not os.path.exists(fused_sem_ids_path):
       self.logger.info(
@@ -571,6 +724,8 @@ class ActionPieceTokenizer(AbstractTokenizer):
       fused_embs = np.concatenate(
           [sent_embs, image_weight * image_embs], axis=-1
       ).astype(np.float32)
+      if self.config.get('fused_final_normalize', False):
+        fused_embs = self._normalize_embs(fused_embs).astype(np.float32)
       self.logger.info(
           f'[TOKENIZER] Fused embeddings shape: {fused_embs.shape}'
       )
@@ -677,11 +832,11 @@ class ActionPieceTokenizer(AbstractTokenizer):
         item2feat = json.load(f)
       return item2feat
     self.logger.info('[TOKENIZER] Generating item features...')
-    if self.config['metadata'] == 'sentence_image_fused':
+    if self.config['metadata'] in {'sentence_image_fused', 'qwen_fused'}:
       item2sem_ids = self._get_fused_sem_ids(dataset)
     else:
       item2sem_ids = self._get_sem_ids(dataset)
-    if self.config['metadata'] == 'sentence_image':
+    if self.config['metadata'] in {'sentence_image', 'qwen_separate'}:
       item2image_sem_ids = self._get_image_sem_ids(dataset)
       item2sem_ids = {
           item: tuple(item2sem_ids[item]) + tuple(item2image_sem_ids[item])
@@ -793,7 +948,12 @@ class ActionPieceTokenizer(AbstractTokenizer):
       tokenizer_filename = 'actionpiece.sentence_image.json'
     elif self.config['metadata'] == 'sentence_image_fused':
       tokenizer_filename = 'actionpiece.sentence_image_fused.json'
-    elif self.config['metadata'] == 'qwen_text':
+    elif self.config['metadata'] in {
+        'qwen_text',
+        'qwen_multimodal',
+        'qwen_separate',
+        'qwen_fused',
+    }:
       tokenizer_filename = (
           f'actionpiece.{self._feature_artifact_stem()}.'
           f'v{self.config["actionpiece_vocab_size"]}.json'
@@ -815,7 +975,12 @@ class ActionPieceTokenizer(AbstractTokenizer):
         merge_log_path = self.config['actionpiece_merge_log_path']
         if merge_log_path is None:
           merge_log_filename = 'actionpiece.merge_log.jsonl'
-          if self.config['metadata'] == 'qwen_text':
+          if self.config['metadata'] in {
+              'qwen_text',
+              'qwen_multimodal',
+              'qwen_separate',
+              'qwen_fused',
+          }:
             merge_log_filename = (
                 f'actionpiece.{self._feature_artifact_stem()}.'
                 f'v{self.config["actionpiece_vocab_size"]}.merge_log.jsonl'

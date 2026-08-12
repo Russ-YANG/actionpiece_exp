@@ -18,7 +18,6 @@
 import logging
 
 from typing import Any
-import datasets as datasets_lib
 
 
 class AbstractDataset:
@@ -112,7 +111,7 @@ class AbstractDataset:
         'This method should be implemented in the subclass'
     )
 
-  def _leave_one_out(self) -> dict[str, datasets_lib.Dataset]:
+  def _leave_one_out(self) -> dict[str, Any]:
     """Splits the dataset into train, validation, and test sets using the leave-one-out strategy.
 
     Returns:
@@ -122,6 +121,8 @@ class AbstractDataset:
               The 'user' key contains a list of users, and the 'item_seq' key
               contains a list of item sequences.
     """
+    import datasets as datasets_lib
+
     datasets = {
         'train': {'user': [], 'item_seq': []},
         'val': {'user': [], 'item_seq': []},
@@ -138,7 +139,7 @@ class AbstractDataset:
         datasets['train']['item_seq'].append(sequence[:-2])
     return {k: datasets_lib.Dataset.from_dict(v) for k, v in datasets.items()}
 
-  def split(self) -> dict[str, datasets_lib.Dataset]:
+  def split(self) -> dict[str, Any]:
     """Split the dataset into train, validation, and test sets based on the specified split strategy."""
     if self.split_data is not None:
       return self.split_data

@@ -465,7 +465,13 @@ class AmazonReviews2014(AbstractDataset):
     elif process_mode in ['sentence', 'qwen_text']:
       # Extract sentences from metadata
       item2meta = self._extract_meta_sentences(metadata=item2raw_meta)
-    elif process_mode in ['sentence_image', 'sentence_image_fused']:
+    elif process_mode in [
+        'sentence_image',
+        'sentence_image_fused',
+        'qwen_multimodal',
+        'qwen_separate',
+        'qwen_fused',
+    ]:
       item2meta = self._extract_meta_sentence_images(metadata=item2raw_meta)
     else:
       raise NotImplementedError('Metadata processing type not implemented.')

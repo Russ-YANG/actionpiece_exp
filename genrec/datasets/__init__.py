@@ -13,6 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Dataset classes for GenRec."""
+"""Dataset classes for GenRec, imported lazily by name."""
 
-from genrec.datasets.AmazonReviews2014.dataset import AmazonReviews2014
+
+def __getattr__(name: str):
+  if name == 'AmazonReviews2014':
+    from genrec.datasets.AmazonReviews2014.dataset import AmazonReviews2014
+    return AmazonReviews2014
+  if name == 'NineRec':
+    from genrec.datasets.NineRec.dataset import NineRec
+    return NineRec
+  raise AttributeError(name)
+
+
+__all__ = ['AmazonReviews2014', 'NineRec']

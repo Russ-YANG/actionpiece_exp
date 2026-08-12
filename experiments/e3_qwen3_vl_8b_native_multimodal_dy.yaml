@@ -1,0 +1,27 @@
+# NineRec DY E3: jointly encode title and cover image at native 4096D.
+subset: DY
+dataset_cache_dir: cache/NineRec/DY
+metadata: qwen_multimodal
+sent_emb_backend: qwen_local
+sent_emb_model: Qwen/Qwen3-VL-Embedding-8B
+sent_emb_dim: 4096
+sent_emb_pca: -1
+qwen_api_instruction: >-
+  Represent this short-video item from its text and cover image for semantic
+  similarity and sequential recommendation. Capture its topic, entities,
+  content category, mood, visual style, and likely viewer intent.
+qwen_local_model_path: /root/autodl-tmp/models/Qwen3-VL-Embedding-8B
+qwen_local_model_revision: 2c4565515e0f265c6511776e7193b22c0968ddc7
+qwen_local_repo_path: /root/autodl-tmp/qwen3-vl-embedding
+qwen_local_code_revision: 393e2978d27852b0d0230d6994f37f9c15bed73c
+qwen_local_batch_size: 8
+qwen_local_max_length: 2048
+qwen_local_torch_dtype: bfloat16
+qwen_local_attn_implementation: sdpa
+qwen_local_require_cuda: true
+qwen_local_image_manifest_sha256: ~ # Fill from ninerec_summary.json.
+pq_n_codebooks: 4
+pq_codebook_size: 256
+n_threads: 8
+tokenizer_only: true
+run_id: dy_e3_qwen3_vl_8b_native_multimodal_d4096

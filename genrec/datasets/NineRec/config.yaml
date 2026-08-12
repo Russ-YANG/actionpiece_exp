@@ -1,0 +1,7 @@
+# NineRec target/source subset, for example DY, QB, Bili_Music, or Bili_500K.
+subset: DY
+metadata: qwen_text
+split: leave_one_out
+ninerec_text_language: bilingual # zh / en / bilingual
+ninerec_pair_order: item-user-time # official get_behaviour.py convention
+ninerec_require_all_images: false
