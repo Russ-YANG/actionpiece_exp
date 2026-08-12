@@ -7,7 +7,7 @@ sent_emb_model: Qwen/Qwen3-VL-Embedding-8B
 sent_emb_dim: 768
 sent_emb_pca: -1
 qwen_api_instruction: >-
-  Represent this short-video item text for semantic similarity and sequential
+  Represent this short-video item for semantic similarity and sequential
   recommendation. Capture its topic, entities, content category, mood, style,
   and likely viewer intent.
 qwen_local_image_instruction: >-
