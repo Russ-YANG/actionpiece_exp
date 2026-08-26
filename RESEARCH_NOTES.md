@@ -2,6 +2,10 @@
 
 Last updated: 2026-07-27
 
+> Historical working notes, frozen at the date above. The OPQ32 task and the
+> “Next experiment priority” list below are no longer active tasks. Treat this
+> file as provenance for the code, not as an authoritative result table.
+
 ## Current Beauty results
 
 All Qwen experiments below use Qwen3-VL-Embedding-8B and four OPQ tokens.

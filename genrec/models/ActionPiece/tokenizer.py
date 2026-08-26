@@ -130,12 +130,17 @@ class ActionPieceTokenizer(AbstractTokenizer):
   def _semantic_artifact_stem(self) -> str:
     if self.config['sent_emb_backend'] not in {'qwen_api', 'qwen_local'}:
       return self._sent_artifact_stem()
-    return (
+    stem = (
         f'{self._sent_artifact_stem()}.'
         f'opq{self.config["pq_n_codebooks"]}x'
         f'{self.config["pq_codebook_size"]}.'
         f'seed{self.config["rand_seed"]}'
     )
+    variant = self.config.get('semantic_id_variant')
+    if variant:
+      safe_variant = re.sub(r'[^A-Za-z0-9._-]+', '-', str(variant))
+      stem = f'{stem}.{safe_variant}'
+    return stem
 
   def _qwen_image_artifact_stem(self) -> str:
     return build_qwen_local_artifact_stem(
@@ -174,12 +179,17 @@ class ActionPieceTokenizer(AbstractTokenizer):
 
   def _image_semantic_artifact_stem(self) -> str:
     """Return a cache-safe identity for independently quantized images."""
-    return (
+    stem = (
         f'{self._qwen_image_artifact_stem()}.'
         f'opq{self.config["image_pq_n_codebooks"]}x'
         f'{self.config["image_pq_codebook_size"]}.'
         f'seed{self.config["rand_seed"]}'
     )
+    variant = self.config.get('semantic_id_variant')
+    if variant:
+      safe_variant = re.sub(r'[^A-Za-z0-9._-]+', '-', str(variant))
+      stem = f'{stem}.{safe_variant}'
+    return stem
 
   def _separate_feature_artifact_stem(self) -> str:
     """Return the E4 identity without creating overlong cache filenames."""
@@ -202,6 +212,11 @@ class ActionPieceTokenizer(AbstractTokenizer):
     )
 
   def _feature_artifact_stem(self) -> str:
+    if self.config['metadata'] == 'qwen_image':
+      return (
+          f'qwen_image.{self._image_semantic_artifact_stem()}.'
+          f'h{self.config["n_hash_buckets"]}'
+      )
     if self.config['metadata'] == 'qwen_separate':
       return self._separate_feature_artifact_stem()
     if self.config['metadata'] == 'qwen_fused':
@@ -519,7 +534,11 @@ class ActionPieceTokenizer(AbstractTokenizer):
     return image_embs
 
   def _get_image_embs(self, dataset: AbstractDataset) -> np.ndarray:
-    if self.config['metadata'] in {'qwen_separate', 'qwen_fused'}:
+    if self.config['metadata'] in {
+        'qwen_image',
+        'qwen_separate',
+        'qwen_fused',
+    }:
       image_emb_path = os.path.join(
           dataset.cache_dir,
           'processed',
@@ -664,7 +683,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
     )
 
   def _get_image_sem_ids(self, dataset: AbstractDataset) -> dict[Any, Any]:
-    if self.config['metadata'] == 'qwen_separate':
+    if self.config['metadata'] in {'qwen_image', 'qwen_separate'}:
       image_sem_ids_filename = f'{self._image_semantic_artifact_stem()}.sem_ids'
     else:
       image_sem_ids_filename = (
@@ -832,7 +851,9 @@ class ActionPieceTokenizer(AbstractTokenizer):
         item2feat = json.load(f)
       return item2feat
     self.logger.info('[TOKENIZER] Generating item features...')
-    if self.config['metadata'] in {'sentence_image_fused', 'qwen_fused'}:
+    if self.config['metadata'] == 'qwen_image':
+      item2sem_ids = self._get_image_sem_ids(dataset)
+    elif self.config['metadata'] in {'sentence_image_fused', 'qwen_fused'}:
       item2sem_ids = self._get_fused_sem_ids(dataset)
     else:
       item2sem_ids = self._get_sem_ids(dataset)
@@ -951,6 +972,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
     elif self.config['metadata'] in {
         'qwen_text',
         'qwen_multimodal',
+        'qwen_image',
         'qwen_separate',
         'qwen_fused',
     }:
@@ -978,6 +1000,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
           if self.config['metadata'] in {
               'qwen_text',
               'qwen_multimodal',
+              'qwen_image',
               'qwen_separate',
               'qwen_fused',
           }:
@@ -1001,11 +1024,26 @@ class ActionPieceTokenizer(AbstractTokenizer):
           dataset, actionpiece
       )
       # Construct ActionPiece vocabulary
+      modality_slots = None
+      if (
+          merge_log_path is not None
+          and self.config['metadata'] in {'sentence_image', 'qwen_separate'}
+      ):
+        text_slot_count = int(self.config['pq_n_codebooks'])
+        image_slot_count = int(self.config['image_pq_n_codebooks'])
+        modality_slots = {
+            'text_slots': list(range(text_slot_count)),
+            'image_slots': list(
+                range(text_slot_count, text_slot_count + image_slot_count)
+            ),
+            'hash_slot': text_slot_count + image_slot_count,
+        }
       actionpiece.train(
           state_corpus=dataset.split_data['train']['item_seq'],
           target_vocab_size=self.config['actionpiece_vocab_size'],
           merge_log_path=merge_log_path,
           merge_log_interval=self.config['actionpiece_merge_log_interval'],
+          modality_slots=modality_slots,
       )
       actionpiece.save(tokenizer_path)
     return actionpiece

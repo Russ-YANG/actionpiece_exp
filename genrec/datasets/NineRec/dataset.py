@@ -21,6 +21,7 @@ IMAGE_SUFFIXES = {'.jpg', '.jpeg', '.png', '.webp'}
 IMAGE_METADATA_MODES = {
     'sentence_image',
     'sentence_image_fused',
+    'qwen_image',
     'qwen_multimodal',
     'qwen_separate',
     'qwen_fused',

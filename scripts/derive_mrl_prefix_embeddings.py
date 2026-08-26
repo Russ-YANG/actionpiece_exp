@@ -16,7 +16,12 @@ def parse_args() -> argparse.Namespace:
   parser.add_argument('--source-path', required=True)
   parser.add_argument('--source-dimension', type=int, required=True)
   parser.add_argument('--item-count', type=int, required=True)
-  parser.add_argument('--output-prefix', required=True)
+  output = parser.add_mutually_exclusive_group(required=True)
+  output.add_argument('--output-prefix')
+  output.add_argument(
+      '--output-template',
+      help='Output path template containing {dimension}.',
+  )
   parser.add_argument('--dimensions', type=int, nargs='+', required=True)
   return parser.parse_args()
 
@@ -61,7 +66,14 @@ def main() -> None:
         f'Source has {source_path.stat().st_size} bytes; expected '
         f'{expected_bytes}.'
     )
-  outputs = [Path(f'{args.output_prefix}.d{d}.sent_emb') for d in dimensions]
+  if args.output_template:
+    if '{dimension}' not in args.output_template:
+      raise ValueError('--output-template must contain {dimension}.')
+    outputs = [
+        Path(args.output_template.format(dimension=d)) for d in dimensions
+    ]
+  else:
+    outputs = [Path(f'{args.output_prefix}.d{d}.sent_emb') for d in dimensions]
   manifests = [Path(f'{path}.manifest.json') for path in outputs]
   existing = [path for path in outputs + manifests if path.exists()]
   if existing:

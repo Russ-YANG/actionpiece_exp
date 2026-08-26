@@ -3,8 +3,10 @@
 
 import argparse
 import collections
+import itertools
 import json
 from pathlib import Path
+import statistics
 from typing import Any, Iterable
 
 
@@ -53,6 +55,14 @@ def parse_args() -> argparse.Namespace:
       '--json-output',
       type=Path,
       help='Optional path for a machine-readable summary.',
+  )
+  parser.add_argument(
+      '--exact-slot-permutation',
+      action='store_true',
+      help=(
+          'Enumerate every equal-size semantic-slot partition and compare the '
+          'real text/image boundary with the exact null distribution.'
+      ),
   )
   return parser.parse_args()
 
@@ -166,6 +176,212 @@ def _phase_group(transition: str) -> str:
   if transition == 'hash_related':
     return transition
   return 'unknown'
+
+
+def _safe_ratio(numerator: float, denominator: float) -> float:
+  return numerator / denominator if denominator else 0.0
+
+
+def analyze_opportunities(
+    merge_records: list[dict[str, Any]],
+) -> dict[str, Any]:
+  """Compare selected merge classes with their candidate exposure."""
+  observed: Counter[str] = Counter()
+  expected_count: Counter[str] = Counter()
+  expected_mass: Counter[str] = Counter()
+  candidate_count_sums: Counter[str] = Counter()
+  candidate_mass_sums: Counter[str] = Counter()
+  covered = 0
+  pure_selected_steps = 0
+  pure_observed_cross = 0
+  pure_expected_count = 0.0
+  pure_expected_mass = 0.0
+  pure_kinds = {'text_text', 'image_image', 'text_image'}
+
+  for record in merge_records:
+    opportunity = record.get('modality_opportunities')
+    if not isinstance(opportunity, dict):
+      continue
+    counts = opportunity.get('candidate_pair_counts')
+    masses = opportunity.get('candidate_priority_mass')
+    selected = opportunity.get('selected_category')
+    if not isinstance(counts, dict) or not isinstance(masses, dict):
+      continue
+    if not isinstance(selected, str):
+      continue
+    counts = {
+        str(kind): max(float(value), 0.0)
+        for kind, value in counts.items()
+        if isinstance(value, (int, float))
+    }
+    masses = {
+        str(kind): max(float(value), 0.0)
+        for kind, value in masses.items()
+        if isinstance(value, (int, float))
+    }
+    total_count = sum(counts.values())
+    total_mass = sum(masses.values())
+    if not total_count or not total_mass:
+      continue
+    covered += 1
+    observed[selected] += 1
+    for kind, value in counts.items():
+      candidate_count_sums[kind] += value
+      expected_count[kind] += value / total_count
+    for kind, value in masses.items():
+      candidate_mass_sums[kind] += value
+      expected_mass[kind] += value / total_mass
+
+    if selected in pure_kinds:
+      pure_selected_steps += 1
+      pure_observed_cross += int(selected == 'text_image')
+      pure_count = sum(counts.get(kind, 0.0) for kind in pure_kinds)
+      pure_mass = sum(masses.get(kind, 0.0) for kind in pure_kinds)
+      pure_expected_count += _safe_ratio(
+          counts.get('text_image', 0.0), pure_count
+      )
+      pure_expected_mass += _safe_ratio(
+          masses.get('text_image', 0.0), pure_mass
+      )
+
+  categories = sorted(
+      set(observed) | set(expected_count) | set(expected_mass)
+  )
+  category_summary = {}
+  for kind in categories:
+    actual = observed[kind]
+    expected_by_count = expected_count[kind]
+    expected_by_mass = expected_mass[kind]
+    category_summary[kind] = {
+        'selected_count': actual,
+        'selected_rate': _safe_ratio(actual, covered),
+        'mean_candidate_count': _safe_ratio(
+            candidate_count_sums[kind], covered
+        ),
+        'mean_candidate_priority_mass': _safe_ratio(
+            candidate_mass_sums[kind], covered
+        ),
+        'expected_selections_by_candidate_count': expected_by_count,
+        'candidate_count_enrichment': _safe_ratio(actual, expected_by_count),
+        'expected_selections_by_priority_mass': expected_by_mass,
+        'priority_mass_enrichment': _safe_ratio(actual, expected_by_mass),
+    }
+
+  return {
+      'available': bool(covered),
+      'covered_merge_events': covered,
+      'coverage': _safe_ratio(covered, len(merge_records)),
+      'categories': category_summary,
+      'first_cross_among_pure_selections': {
+          'selected_pure_merge_events': pure_selected_steps,
+          'observed_text_image_count': pure_observed_cross,
+          'observed_text_image_rate': _safe_ratio(
+              pure_observed_cross, pure_selected_steps
+          ),
+          'expected_text_image_by_candidate_count': pure_expected_count,
+          'candidate_count_enrichment': _safe_ratio(
+              pure_observed_cross, pure_expected_count
+          ),
+          'expected_text_image_by_priority_mass': pure_expected_mass,
+          'priority_mass_enrichment': _safe_ratio(
+              pure_observed_cross, pure_expected_mass
+          ),
+      },
+  }
+
+
+def _permutation_metrics(summary: dict[str, Any]) -> dict[str, float]:
+  outputs = summary['output_composition']['rule_counts']
+  transitions = summary['operand_transitions']['rule_counts']
+  pure_kinds = ('text_text', 'image_image', 'text_image')
+  fusion_kinds = ('text_image', 'mixed_text', 'mixed_image', 'mixed_mixed')
+  nonhash_kinds = ('text_text', 'image_image', *fusion_kinds)
+  return {
+      'direct_cross_rate_among_pure': _safe_ratio(
+          transitions.get('text_image', 0),
+          sum(transitions.get(kind, 0) for kind in pure_kinds),
+      ),
+      'fusion_rule_rate_no_hash': _safe_ratio(
+          sum(transitions.get(kind, 0) for kind in fusion_kinds),
+          sum(transitions.get(kind, 0) for kind in nonhash_kinds),
+      ),
+      'output_mixed_rate': _safe_ratio(
+          outputs.get('text_image', 0), sum(outputs.values())
+      ),
+  }
+
+
+def _exact_null_summary(observed: float, values: list[float]) -> dict[str, Any]:
+  mean = statistics.fmean(values)
+  std = statistics.pstdev(values)
+  tolerance = 1e-12
+  deviation = abs(observed - mean)
+  return {
+      'observed': observed,
+      'null_mean': mean,
+      'null_std': std,
+      'null_min': min(values),
+      'null_max': max(values),
+      'enrichment': _safe_ratio(observed, mean),
+      'z_score': _safe_ratio(observed - mean, std),
+      'exact_p_greater_equal': _safe_ratio(
+          sum(value >= observed - tolerance for value in values), len(values)
+      ),
+      'exact_p_less_equal': _safe_ratio(
+          sum(value <= observed + tolerance for value in values), len(values)
+      ),
+      'exact_p_two_sided': _safe_ratio(
+          sum(
+              abs(value - mean) >= deviation - tolerance for value in values
+          ),
+          len(values),
+      ),
+  }
+
+
+def analyze_exact_slot_permutation(
+    records: list[dict[str, Any]],
+    text_slots: set[int],
+    image_slots: set[int],
+    hash_slot: int,
+) -> dict[str, Any]:
+  """Test the real modality boundary against all equal-size slot partitions."""
+  if len(text_slots) != len(image_slots):
+    raise ValueError('Exact slot permutation requires equal modality sizes.')
+  semantic_slots = sorted(text_slots | image_slots)
+  partitions = list(itertools.combinations(semantic_slots, len(text_slots)))
+  real_partition = tuple(sorted(text_slots))
+  distributions: dict[str, list[float]] = collections.defaultdict(list)
+  observed = None
+  for partition in partitions:
+    candidate_text = set(partition)
+    candidate_image = set(semantic_slots) - candidate_text
+    summary = analyze_records(
+        records,
+        candidate_text,
+        candidate_image,
+        hash_slot,
+        bins=1,
+        example_limit=0,
+    )
+    metrics = _permutation_metrics(summary)
+    if partition == real_partition:
+      observed = metrics
+    for name, value in metrics.items():
+      distributions[name].append(value)
+  if observed is None:
+    raise ValueError('The real text slot partition was not enumerated.')
+  return {
+      'method': 'exhaustive_equal_size_semantic_slot_label_permutation',
+      'real_text_slots': sorted(text_slots),
+      'semantic_slots': semantic_slots,
+      'labeled_partition_count': len(partitions),
+      'unlabeled_partition_count': len(partitions) // 2,
+      'metrics': {
+          name: _exact_null_summary(observed[name], values)
+          for name, values in distributions.items()
+      },
+  }
 
 
 def analyze_records(
@@ -299,6 +515,7 @@ def analyze_records(
           'unresolved_operands': unresolved_operands,
           'examples': dict(examples),
       },
+      'candidate_opportunity_adjustment': analyze_opportunities(merge_records),
       'phases': phases,
   }
 
@@ -357,6 +574,58 @@ def _print_phases(phases: list[dict[str, Any]]) -> None:
     )
 
 
+def _print_opportunities(opportunities: dict[str, Any]) -> None:
+  if not opportunities['available']:
+    print('\nCandidate opportunity adjustment: unavailable in this log.')
+    return
+  print('\nCandidate opportunity-adjusted selections')
+  print(
+      f'{"Type":<22} {"Selected":>9} {"Count exp.":>12} '
+      f'{"Count enrich.":>14} {"Mass exp.":>12} {"Mass enrich.":>13}'
+  )
+  print('-' * 86)
+  for kind, values in sorted(
+      opportunities['categories'].items(),
+      key=lambda item: (-item[1]['selected_count'], item[0]),
+  ):
+    print(
+        f'{kind:<22} {values["selected_count"]:>9} '
+        f'{values["expected_selections_by_candidate_count"]:>12.1f} '
+        f'{values["candidate_count_enrichment"]:>14.3f} '
+        f'{values["expected_selections_by_priority_mass"]:>12.1f} '
+        f'{values["priority_mass_enrichment"]:>13.3f}'
+    )
+  first_cross = opportunities['first_cross_among_pure_selections']
+  print(
+      'First text-image merges among pure-modality selections: '
+      f'{first_cross["observed_text_image_count"]}/'
+      f'{first_cross["selected_pure_merge_events"]} '
+      f'({100 * first_cross["observed_text_image_rate"]:.2f}%), '
+      f'count enrichment={first_cross["candidate_count_enrichment"]:.3f}, '
+      f'mass enrichment={first_cross["priority_mass_enrichment"]:.3f}'
+  )
+
+
+def _print_exact_permutation(permutation: dict[str, Any]) -> None:
+  print('\nExact semantic-slot partition permutation')
+  print(
+      f'Compared the real boundary with '
+      f'{permutation["labeled_partition_count"]} labeled partitions.'
+  )
+  print(
+      f'{"Metric":<34} {"Observed":>10} {"Null mean":>11} '
+      f'{"Enrich.":>9} {"p (greater)":>12} {"p (two)":>9}'
+  )
+  print('-' * 91)
+  for name, values in permutation['metrics'].items():
+    print(
+        f'{name:<34} {values["observed"]:>10.4f} '
+        f'{values["null_mean"]:>11.4f} {values["enrichment"]:>9.3f} '
+        f'{values["exact_p_greater_equal"]:>12.4f} '
+        f'{values["exact_p_two_sided"]:>9.4f}'
+    )
+
+
 def main() -> None:
   args = parse_args()
   text_slots = set(range(args.text_slots))
@@ -381,6 +650,10 @@ def main() -> None:
   )
   summary['log_path'] = str(args.log_path)
   summary['malformed_records'] = malformed_count
+  if args.exact_slot_permutation:
+    summary['exact_slot_permutation'] = analyze_exact_slot_permutation(
+        records, text_slots, image_slots, args.hash_slot
+    )
 
   print(f'Log: {args.log_path}')
   print(f'Total merge events: {summary["total_merge_events"]}')
@@ -413,6 +686,9 @@ def main() -> None:
   if malformed_count:
     print(f'Skipped malformed records: {malformed_count}')
   _print_phases(summary['phases'])
+  _print_opportunities(summary['candidate_opportunity_adjustment'])
+  if args.exact_slot_permutation:
+    _print_exact_permutation(summary['exact_slot_permutation'])
 
   if args.examples:
     print('\nTransition examples:')

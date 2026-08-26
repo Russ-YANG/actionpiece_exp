@@ -1,0 +1,353 @@
+{
+  "total_merge_events": 37823,
+  "max_step": 37823,
+  "slots": {
+    "text": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "image": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "hash": 8
+  },
+  "output_composition": {
+    "rule_counts": {
+      "text_image": 24392,
+      "image_only": 6912,
+      "text_only": 6519
+    },
+    "priority_weights": {
+      "text_image": 1017355.2271104148,
+      "image_only": 251428.75469907362,
+      "text_only": 277088.5721932468
+    },
+    "affected_sequence_weights": {
+      "text_image": 3061861.0,
+      "image_only": 834080.0,
+      "text_only": 1026158.0
+    },
+    "includes_hash_count": 10182
+  },
+  "operand_transitions": {
+    "rule_counts": {
+      "text_image": 11571,
+      "mixed_image": 3927,
+      "image_image": 3960,
+      "mixed_text": 3058,
+      "text_text": 4032,
+      "mixed_mixed": 1093,
+      "hash_related": 10182
+    },
+    "priority_weights": {
+      "text_image": 506146.7125587379,
+      "mixed_image": 164887.29727891105,
+      "image_image": 161776.61786233954,
+      "mixed_text": 137671.07690145544,
+      "text_text": 201346.26218143775,
+      "mixed_mixed": 41275.819434523764,
+      "hash_related": 332768.7677853357
+    },
+    "affected_sequence_weights": {
+      "text_image": 1857952.0,
+      "mixed_image": 432622.0,
+      "image_image": 564262.0,
+      "mixed_text": 386615.0,
+      "text_text": 769107.0,
+      "mixed_mixed": 86165.0,
+      "hash_related": 825376.0
+    },
+    "first_steps": {
+      "text_image": 1,
+      "mixed_image": 2,
+      "image_image": 3,
+      "mixed_text": 7,
+      "text_text": 9,
+      "mixed_mixed": 52,
+      "hash_related": 318
+    },
+    "unresolved_operands": 0,
+    "examples": {
+      "text_image": [],
+      "mixed_image": [],
+      "image_image": [],
+      "mixed_text": [],
+      "text_text": [],
+      "mixed_mixed": [],
+      "hash_related": []
+    }
+  },
+  "candidate_opportunity_adjustment": {
+    "available": false,
+    "covered_merge_events": 0,
+    "coverage": 0.0,
+    "categories": {},
+    "first_cross_among_pure_selections": {
+      "selected_pure_merge_events": 0,
+      "observed_text_image_count": 0,
+      "observed_text_image_rate": 0.0,
+      "expected_text_image_by_candidate_count": 0.0,
+      "candidate_count_enrichment": 0.0,
+      "expected_text_image_by_priority_mass": 0.0,
+      "priority_mass_enrichment": 0.0
+    }
+  },
+  "phases": [
+    {
+      "bin": 1,
+      "step_start": 1,
+      "step_end": 3782,
+      "rule_counts": {
+        "text_image": 1419,
+        "mixed_related": 900,
+        "image_image": 416,
+        "text_text": 686,
+        "hash_related": 362
+      },
+      "priority_weights": {
+        "text_image": 184624.02432004354,
+        "mixed_related": 118375.74238567655,
+        "image_image": 54336.863587648266,
+        "text_text": 91017.46087585101,
+        "hash_related": 39770.19239654195
+      }
+    },
+    {
+      "bin": 2,
+      "step_start": 3783,
+      "step_end": 7564,
+      "rule_counts": {
+        "text_image": 1347,
+        "image_image": 380,
+        "text_text": 516,
+        "mixed_related": 816,
+        "hash_related": 723
+      },
+      "priority_weights": {
+        "text_image": 79930.9854922523,
+        "image_image": 22496.970958207326,
+        "text_text": 30456.49533336478,
+        "mixed_related": 48345.98850576324,
+        "hash_related": 44699.0188813303
+      }
+    },
+    {
+      "bin": 3,
+      "step_start": 7565,
+      "step_end": 11346,
+      "rule_counts": {
+        "text_image": 1178,
+        "mixed_related": 875,
+        "text_text": 438,
+        "image_image": 377,
+        "hash_related": 914
+      },
+      "priority_weights": {
+        "text_image": 51518.76445184554,
+        "mixed_related": 38928.08046721463,
+        "text_text": 19120.452234032466,
+        "image_image": 16443.246494551495,
+        "hash_related": 42088.59670288478
+      }
+    },
+    {
+      "bin": 4,
+      "step_start": 11347,
+      "step_end": 15129,
+      "rule_counts": {
+        "hash_related": 1066,
+        "image_image": 343,
+        "text_image": 1141,
+        "mixed_related": 835,
+        "text_text": 398
+      },
+      "priority_weights": {
+        "hash_related": 39546.789793398835,
+        "image_image": 12268.444446176592,
+        "text_image": 40577.31933075073,
+        "mixed_related": 29999.610087396057,
+        "text_text": 14163.285179516231
+      }
+    },
+    {
+      "bin": 5,
+      "step_start": 15130,
+      "step_end": 18911,
+      "rule_counts": {
+        "image_image": 394,
+        "hash_related": 1119,
+        "mixed_related": 789,
+        "text_image": 1098,
+        "text_text": 382
+      },
+      "priority_weights": {
+        "image_image": 11923.780986237074,
+        "hash_related": 34834.07970600276,
+        "mixed_related": 24104.68452380953,
+        "text_image": 33295.842092781546,
+        "text_text": 11571.613531116127
+      }
+    },
+    {
+      "bin": 6,
+      "step_start": 18912,
+      "step_end": 22693,
+      "rule_counts": {
+        "text_text": 347,
+        "text_image": 1084,
+        "hash_related": 1132,
+        "mixed_related": 783,
+        "image_image": 436
+      },
+      "priority_weights": {
+        "text_text": 9137.245390211621,
+        "text_image": 28560.91868716923,
+        "hash_related": 30545.280510676494,
+        "mixed_related": 20868.079143046092,
+        "image_image": 11549.279021478944
+      }
+    },
+    {
+      "bin": 7,
+      "step_start": 22694,
+      "step_end": 26476,
+      "rule_counts": {
+        "hash_related": 1179,
+        "text_image": 1114,
+        "image_image": 387,
+        "mixed_related": 782,
+        "text_text": 321
+      },
+      "priority_weights": {
+        "hash_related": 28469.110350686562,
+        "text_image": 26111.332882967898,
+        "image_image": 9077.203429075318,
+        "mixed_related": 18526.501106859403,
+        "text_text": 7527.629120212889
+      }
+    },
+    {
+      "bin": 8,
+      "step_start": 26477,
+      "step_end": 30258,
+      "rule_counts": {
+        "hash_related": 1243,
+        "mixed_related": 758,
+        "image_image": 416,
+        "text_image": 1021,
+        "text_text": 344
+      },
+      "priority_weights": {
+        "hash_related": 27055.719183830926,
+        "mixed_related": 16275.302877456525,
+        "image_image": 8819.304255165021,
+        "text_image": 21591.18925689719,
+        "text_text": 7290.1795535714145
+      }
+    },
+    {
+      "bin": 9,
+      "step_start": 30259,
+      "step_end": 34040,
+      "rule_counts": {
+        "mixed_related": 736,
+        "text_image": 1138,
+        "hash_related": 1178,
+        "image_image": 399,
+        "text_text": 331
+      },
+      "priority_weights": {
+        "mixed_related": 14193.458222789115,
+        "text_image": 21851.228161060717,
+        "hash_related": 23067.692942491827,
+        "image_image": 7648.841074577967,
+        "text_text": 6342.844074231536
+      }
+    },
+    {
+      "bin": 10,
+      "step_start": 34041,
+      "step_end": 37823,
+      "rule_counts": {
+        "hash_related": 1266,
+        "mixed_related": 804,
+        "text_image": 1031,
+        "image_image": 412,
+        "text_text": 269
+      },
+      "priority_weights": {
+        "hash_related": 22692.287317491813,
+        "mixed_related": 14216.746294879087,
+        "text_image": 18085.107882967983,
+        "image_image": 7212.683609221455,
+        "text_text": 4719.056889329802
+      }
+    }
+  ],
+  "log_path": "cache/AmazonReviews2014/Beauty/processed/actionpiece.qwen_separate.Qwen3-VL-Embedding-8B.t768.th53fe43ac7a78.i768.ihe8d8f4d4b3a1.topq4x256.iopq4x256.seed2024.h128.v40000.merge_log.jsonl",
+  "malformed_records": 0,
+  "exact_slot_permutation": {
+    "method": "exhaustive_equal_size_semantic_slot_label_permutation",
+    "real_text_slots": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "semantic_slots": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "labeled_partition_count": 70,
+    "unlabeled_partition_count": 35,
+    "metrics": {
+      "direct_cross_rate_among_pure": {
+        "observed": 0.5914737003527066,
+        "null_mean": 0.5915980129710784,
+        "null_std": 0.003274676148541344,
+        "null_min": 0.5843128757922106,
+        "null_max": 0.5996300211416491,
+        "enrichment": 0.9997898697837955,
+        "z_score": -0.03796180530008478,
+        "exact_p_greater_equal": 0.45714285714285713,
+        "exact_p_less_equal": 0.5714285714285714,
+        "exact_p_two_sided": 0.9428571428571428
+      },
+      "fusion_rule_rate_no_hash": {
+        "observed": 0.7108642957924822,
+        "null_mean": 0.7278835270586654,
+        "null_std": 0.007615238016042657,
+        "null_min": 0.7019644730653739,
+        "null_max": 0.7374914076914728,
+        "enrichment": 0.9766181942117073,
+        "z_score": -2.234891572703258,
+        "exact_p_greater_equal": 0.9714285714285714,
+        "exact_p_less_equal": 0.05714285714285714,
+        "exact_p_two_sided": 0.05714285714285714
+      },
+      "output_mixed_rate": {
+        "observed": 0.6448986066679004,
+        "null_mean": 0.6644407597795748,
+        "null_std": 0.009544535844336767,
+        "null_min": 0.6304365068873437,
+        "null_max": 0.6762816275811014,
+        "enrichment": 0.9705885696745074,
+        "z_score": -2.0474702416534694,
+        "exact_p_greater_equal": 0.9714285714285714,
+        "exact_p_less_equal": 0.05714285714285714,
+        "exact_p_two_sided": 0.05714285714285714
+      }
+    }
+  }
+}

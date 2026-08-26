@@ -2,7 +2,10 @@
 
 import unittest
 
-from scripts.analyze_modality_merges import analyze_records
+from scripts.analyze_modality_merges import (
+    analyze_exact_slot_permutation,
+    analyze_records,
+)
 
 
 def merge_record(
@@ -92,6 +95,89 @@ class AnalyzeModalityMergesTest(unittest.TestCase):
     self.assertEqual(
         summary['operand_transitions']['first_steps']['text_image'], 3
     )
+    self.assertFalse(summary['candidate_opportunity_adjustment']['available'])
+
+  def test_adjusts_selected_merges_for_candidate_opportunities(self):
+    records = [
+        merge_record(
+            1, 100, [10, 20], [0, 1], [4, 2], [[0, 1], [4, 2]]
+        ),
+        merge_record(
+            2, 101, [11, 12], [1, 1], [2, 2], [[1, 1], [2, 2]]
+        ),
+    ]
+    records[0]['modality_opportunities'] = {
+        'selected_category': 'text_image',
+        'candidate_pair_counts': {
+            'text_text': 2,
+            'image_image': 2,
+            'text_image': 4,
+        },
+        'candidate_priority_mass': {
+            'text_text': 1,
+            'image_image': 1,
+            'text_image': 2,
+        },
+        'candidate_max_priority': {
+            'text_text': 0.5,
+            'image_image': 0.5,
+            'text_image': 1,
+        },
+    }
+    records[1]['modality_opportunities'] = {
+        'selected_category': 'text_text',
+        'candidate_pair_counts': {
+            'text_text': 2,
+            'image_image': 2,
+            'text_image': 4,
+        },
+        'candidate_priority_mass': {
+            'text_text': 1,
+            'image_image': 1,
+            'text_image': 2,
+        },
+        'candidate_max_priority': {
+            'text_text': 1,
+            'image_image': 0.5,
+            'text_image': 0.5,
+        },
+    }
+
+    summary = analyze_records(
+        records,
+        text_slots={0, 1, 2, 3},
+        image_slots={4, 5, 6, 7},
+        hash_slot=8,
+        bins=2,
+        example_limit=0,
+    )
+    adjusted = summary['candidate_opportunity_adjustment']
+    self.assertTrue(adjusted['available'])
+    self.assertEqual(adjusted['covered_merge_events'], 2)
+    first_cross = adjusted['first_cross_among_pure_selections']
+    self.assertEqual(first_cross['observed_text_image_count'], 1)
+    self.assertAlmostEqual(
+        first_cross['expected_text_image_by_candidate_count'], 1.0
+    )
+    self.assertAlmostEqual(first_cross['candidate_count_enrichment'], 1.0)
+
+  def test_exactly_enumerates_equal_size_slot_partitions(self):
+    records = [
+        merge_record(1, 100, [10, 20], [0, 1], [2, 2], [[0, 1], [2, 2]]),
+        merge_record(2, 101, [11, 21], [1, 1], [3, 2], [[1, 1], [3, 2]]),
+        merge_record(3, 102, [12, 13], [0, 2], [1, 3], [[0, 2], [1, 3]]),
+    ]
+    result = analyze_exact_slot_permutation(
+        records,
+        text_slots={0, 1},
+        image_slots={2, 3},
+        hash_slot=4,
+    )
+    self.assertEqual(result['labeled_partition_count'], 6)
+    self.assertEqual(result['unlabeled_partition_count'], 3)
+    metric = result['metrics']['direct_cross_rate_among_pure']
+    self.assertAlmostEqual(metric['observed'], 2 / 3)
+    self.assertGreaterEqual(metric['exact_p_greater_equal'], 1 / 3)
 
 
 if __name__ == '__main__':

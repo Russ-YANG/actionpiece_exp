@@ -64,6 +64,8 @@ pq_n_codebooks: 4
 pq_codebook_size: 256
 image_pq_n_codebooks: 4
 image_pq_codebook_size: 256
+# Optional cache identity for precomputed semantic-ID transformations.
+semantic_id_variant: ~
 n_hash_buckets: 128
 
 # Config for the action tokenizer

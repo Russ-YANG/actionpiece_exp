@@ -38,7 +38,13 @@ def diff_cnt(cnt1, cnt2):
   Returns:
       dict: A duplication, not inplace.
   """
-  return {k: v - cnt2.get(k, 0) for k, v in cnt1.items()}
+  # Include keys that disappeared entirely from cnt1. Omitting them leaves
+  # stale counts and head IDs in the inverted index, which can later make the
+  # same head look both present and newly added for a pair.
+  return {
+      key: cnt1.get(key, 0) - cnt2.get(key, 0)
+      for key in cnt1.keys() | cnt2.keys()
+  }
 
 
 def add_cnt_inplace(cnt1, cnt2):
@@ -339,6 +345,99 @@ class ActionPieceCore:
       # Note that in Python, the priority queue is a min heap.
       # Thus, we need to negate the count to make it a max heap.
       self.pq.put((-cnt, (tk1, tk2)))
+    self._initialize_modality_opportunities()
+
+  def _modality_kind(self, token):
+    """Return the tracked modality composition of one token."""
+    if token in self.modality_token_kinds:
+      return self.modality_token_kinds[token]
+    slots = {int(feature[0]) for feature in self._decode_single_token(token)}
+    tracking = self.modality_tracking
+    has_text = bool(slots & tracking['text_slots'])
+    has_image = bool(slots & tracking['image_slots'])
+    has_hash = tracking['hash_slot'] in slots
+    known = tracking['text_slots'] | tracking['image_slots']
+    if tracking['hash_slot'] >= 0:
+      known = known | {tracking['hash_slot']}
+    if slots - known:
+      result = ('unknown', has_hash)
+      self.modality_token_kinds[token] = result
+      return result
+    if has_text and has_image:
+      result = ('mixed', has_hash)
+    elif has_text:
+      result = ('text', has_hash)
+    elif has_image:
+      result = ('image', has_hash)
+    elif has_hash:
+      result = ('hash', True)
+    else:
+      result = ('unknown', False)
+    self.modality_token_kinds[token] = result
+    return result
+
+  def _modality_pair_kind(self, pair):
+    """Classify a candidate pair for opportunity-adjusted merge tracking."""
+    left_kind, left_hash = self._modality_kind(pair[0])
+    right_kind, right_hash = self._modality_kind(pair[1])
+    if left_hash or right_hash or left_kind == 'hash' or right_kind == 'hash':
+      return 'hash_related'
+    if left_kind == 'unknown' or right_kind == 'unknown':
+      return 'unknown'
+    if left_kind == right_kind:
+      return f'{left_kind}_{right_kind}'
+    names = {
+        frozenset(('text', 'image')): 'text_image',
+        frozenset(('mixed', 'text')): 'mixed_text',
+        frozenset(('mixed', 'image')): 'mixed_image',
+    }
+    return names.get(
+        frozenset((left_kind, right_kind)),
+        '_'.join(sorted((left_kind, right_kind))),
+    )
+
+  def _initialize_modality_opportunities(self):
+    """Initialize incremental candidate exposure statistics."""
+    if self.modality_tracking is None:
+      return
+    self.modality_candidate_counts = collections.Counter()
+    self.modality_candidate_mass = collections.Counter()
+    self.modality_candidate_heaps = collections.defaultdict(PriorityQueue)
+    for pair, count in self.all_pair2cnt.items():
+      if count <= self.eps:
+        continue
+      kind = self._modality_pair_kind(pair)
+      self.modality_candidate_counts[kind] += 1
+      self.modality_candidate_mass[kind] += count
+      self.modality_candidate_heaps[kind].put((-count, pair))
+
+  def _modality_max_priority(self, kind):
+    """Return the current maximum candidate score for a modality class."""
+    heap = self.modality_candidate_heaps[kind]
+    while not heap.empty():
+      negative_count, pair = heap.queue[0]
+      current = self.all_pair2cnt.get(pair, 0.0)
+      if current > self.eps and abs(current + negative_count) <= self.eps:
+        return current
+      heap.get()
+    return 0.0
+
+  def _modality_opportunity_snapshot(self):
+    """Snapshot candidate counts and score mass before a merge selection."""
+    if self.modality_tracking is None:
+      return None
+    kinds = sorted(self.modality_candidate_counts)
+    return {
+        'candidate_pair_counts': {
+            kind: self.modality_candidate_counts[kind] for kind in kinds
+        },
+        'candidate_priority_mass': {
+            kind: self.modality_candidate_mass[kind] for kind in kinds
+        },
+        'candidate_max_priority': {
+            kind: self._modality_max_priority(kind) for kind in kinds
+        },
+    }
 
   def _outdated(self, pair, priority):
     """The priority queue (heap) will be lazy updated, meaning that.
@@ -563,7 +662,18 @@ class ActionPieceCore:
       if abs(diff[pair]) < self.eps:
         # No change, thus no need to update
         continue
+      old_count = self.all_pair2cnt[pair]
       self.all_pair2cnt[pair] += diff[pair]
+      new_count = self.all_pair2cnt[pair]
+      if self.modality_tracking is not None:
+        kind = self._modality_pair_kind(pair)
+        if old_count > self.eps:
+          self.modality_candidate_counts[kind] -= 1
+          self.modality_candidate_mass[kind] -= old_count
+        if new_count > self.eps:
+          self.modality_candidate_counts[kind] += 1
+          self.modality_candidate_mass[kind] += new_count
+          self.modality_candidate_heaps[kind].put((-new_count, pair))
       # Note that in Python, the priority queue is a min heap.
       # Thus, we need to negate the count to make it a max heap.
       self.pq.put((-self.all_pair2cnt[pair], pair))
@@ -594,6 +704,7 @@ class ActionPieceCore:
       target_vocab_size: int,
       merge_log_path: str | None = None,
       merge_log_interval: int = 1,
+      modality_slots: dict[str, Any] | None = None,
   ):
     """Train the ActionPiece tokenizer.
 
@@ -603,7 +714,17 @@ class ActionPieceCore:
         target_vocab_size (int): The target vocabulary size.
         merge_log_path (str, optional): JSONL path for recording merge steps.
         merge_log_interval (int): Record every n merge steps.
+        modality_slots (dict, optional): Text/image/hash slot definitions used
+          to record candidate opportunity statistics before every merge.
     """
+    self.modality_tracking = None
+    self.modality_token_kinds = {}
+    if modality_slots is not None:
+      self.modality_tracking = {
+          'text_slots': {int(slot) for slot in modality_slots['text_slots']},
+          'image_slots': {int(slot) for slot in modality_slots['image_slots']},
+          'hash_slot': int(modality_slots.get('hash_slot', -1)),
+      }
     token_corpus = self._get_token_corpus(state_corpus)
     # Build the data structures for the training process
     self._build(token_corpus)
@@ -622,6 +743,15 @@ class ActionPieceCore:
               'initial_vocab_size': self.n_init_feats,
               'target_vocab_size': target_vocab_size,
               'n_sequences': len(token_corpus),
+              'modality_slots': (
+                  {
+                      'text_slots': sorted(self.modality_tracking['text_slots']),
+                      'image_slots': sorted(self.modality_tracking['image_slots']),
+                      'hash_slot': self.modality_tracking['hash_slot'],
+                  }
+                  if self.modality_tracking is not None
+                  else None
+              ),
           },
       )
 
@@ -653,6 +783,7 @@ class ActionPieceCore:
 
   def _train_step(self):
     """The difference is additionally recording priority scores here."""
+    opportunity_snapshot = self._modality_opportunity_snapshot()
     priority, tk1, tk2 = None, None, None
     while not self.pq.empty():
       # Get the pair with maximum appearance
@@ -699,7 +830,7 @@ class ActionPieceCore:
       add_cnt_inplace(all_diff, diff_pair2cnt)
     # Update the priority queue of the updated pair appearances.
     self._update_pq(all_diff)
-    return {
+    record = {
         'event': 'merge',
         'step': new_token - self.n_init_feats + 1,
         'new_token': new_token,
@@ -726,6 +857,12 @@ class ActionPieceCore:
         ],
         'pair_count_updates': len(all_diff),
     }
+    if opportunity_snapshot is not None:
+      opportunity_snapshot['selected_category'] = self._modality_pair_kind(
+          (tk1, tk2)
+      )
+      record['modality_opportunities'] = opportunity_snapshot
+    return record
 
   def _random_walk_augmentation(self, state_seq: np.ndarray):
     """Random walk augmentation, flatten the state sequence into a sequence of initial tokens.

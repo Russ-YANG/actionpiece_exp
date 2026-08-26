@@ -1,0 +1,77 @@
+{
+  "method": "maximum_weight_perfect_matching",
+  "edge_weight": "maximum training-interaction frequency of a value pair",
+  "training_split": "all_item_seqs[:-2]",
+  "base": 256,
+  "total_matching_score": 8044,
+  "matching": [
+    {
+      "slots": [
+        "t1",
+        "t2"
+      ],
+      "slot_indices": [
+        0,
+        1
+      ],
+      "max_value_pair_frequency": 2057,
+      "unique_value_pairs": 2615
+    },
+    {
+      "slots": [
+        "t3",
+        "i3"
+      ],
+      "slot_indices": [
+        2,
+        6
+      ],
+      "max_value_pair_frequency": 2517,
+      "unique_value_pairs": 5959
+    },
+    {
+      "slots": [
+        "t4",
+        "i1"
+      ],
+      "slot_indices": [
+        3,
+        4
+      ],
+      "max_value_pair_frequency": 1796,
+      "unique_value_pairs": 4046
+    },
+    {
+      "slots": [
+        "i2",
+        "i4"
+      ],
+      "slot_indices": [
+        5,
+        7
+      ],
+      "max_value_pair_frequency": 1674,
+      "unique_value_pairs": 4497
+    }
+  ],
+  "stream_a_pairs": [
+    [
+      0,
+      1
+    ],
+    [
+      2,
+      6
+    ]
+  ],
+  "stream_b_pairs": [
+    [
+      3,
+      4
+    ],
+    [
+      5,
+      7
+    ]
+  ]
+}

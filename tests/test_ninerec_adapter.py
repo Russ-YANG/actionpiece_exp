@@ -86,6 +86,10 @@ class NineRecAdapterTest(unittest.TestCase):
       )
       self.assertEqual(fused['v1']['sentence'], metadata['v1'])
       self.assertTrue(Path(fused['v1']['image_url']).is_file())
+      image_only = json.loads(
+          (output / 'metadata.qwen_image.json').read_text(encoding='utf-8')
+      )
+      self.assertEqual(image_only, fused)
 
       manifest = load_image_manifest(
           output / 'image_download_manifest.jsonl'

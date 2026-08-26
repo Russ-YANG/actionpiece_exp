@@ -1,7 +1,15 @@
 cache/
+.cache/
+.codex_stage/
+.github_stage/
 .env.local
+AGENTS.md
+FUTURE_RESEARCH_HANDOVER.md
+baselines/
+tmp/
 ckpt/
 logs/
+*.log
 tensorboard/
 merge_logs/
 .ipynb_checkpoints/

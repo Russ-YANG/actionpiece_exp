@@ -1,0 +1,25 @@
+# Beauty E1 tokenizer-only build from the normalized 1536D Qwen MRL prefix.
+category: Beauty
+metadata: qwen_text
+sent_emb_backend: qwen_local
+sent_emb_model: Qwen/Qwen3-VL-Embedding-8B
+sent_emb_dim: 1536
+sent_emb_pca: -1
+qwen_api_instruction: >-
+  Represent this e-commerce product for semantic similarity and sequential
+  recommendation. Capture its category, function, attributes, style, and likely
+  user intent.
+qwen_local_model_path: /root/autodl-tmp/models/Qwen3-VL-Embedding-8B
+qwen_local_model_revision: 2c4565515e0f265c6511776e7193b22c0968ddc7
+qwen_local_repo_path: /root/autodl-tmp/qwen3-vl-embedding
+qwen_local_code_revision: 393e2978d27852b0d0230d6994f37f9c15bed73c
+qwen_local_batch_size: 8
+qwen_local_max_length: 2048
+qwen_local_torch_dtype: bfloat16
+qwen_local_attn_implementation: sdpa
+qwen_local_require_cuda: true
+pq_n_codebooks: 4
+pq_codebook_size: 256
+n_threads: 2
+tokenizer_only: true
+run_id: beauty_e1_qwen3_vl_8b_text_d1536

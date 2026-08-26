@@ -2,15 +2,30 @@
 
 This repository is an experimental extension of
 [ActionPiece](https://arxiv.org/abs/2502.13581) for multimodal generative
-recommendation. The current work evaluates text, image, and fused product
-representations on Amazon Reviews 2014, starting with the Beauty category.
+recommendation. It contains the code and configurations used to study
+multimodal fusion and semantic bandwidth on Beauty, DY, and QB. Sports is kept
+as an additional diagnostic configuration outside the primary study scope.
 
-## Current experiment
+## Experiment scope
 
-E1 replaces the original Sentence-T5 text encoder with the open-weight
-`Qwen/Qwen3-VL-Embedding-8B` model. It produces 768-dimensional normalized text
-embeddings, converts them into four OPQ/PQ codes, and constructs a 40,000-token
-ActionPiece vocabulary.
+The implemented representation routes are:
+
+- text-only and image-only Qwen embeddings;
+- native joint text-image Qwen embeddings;
+- separate continuous text/image embeddings concatenated before shared OPQ;
+- separate text/image OPQ streams followed by ActionPiece tokenization;
+- embedding-prefix and fixed-bottleneck semantic-bandwidth controls;
+- merge-provenance, candidate-opportunity, and exact slot-permutation
+  diagnostics.
+
+Historical experiment filenames use `E4` for separate quantization followed by
+ActionPiece and `E5` for continuous concatenation. Use the descriptive route
+names when comparing these configurations with external manuscripts.
+
+The validated 768D E1/E2/E3 matrices are published separately in
+[qwen-multimodal-recommendation-embeddings](https://github.com/Russ-YANG/qwen-multimodal-recommendation-embeddings).
+
+## Workflow
 
 The workflow has two stages:
 
@@ -88,18 +103,22 @@ its original directory structure under
 `cache/AmazonReviews2014/Beauty/processed/`; do not rebuild or mix tokenizer
 artifacts from a different encoder configuration.
 
-## Planned comparisons
+## Implemented configurations
 
-- Text-only Qwen embedding.
-- Image-only Qwen embedding.
-- Native text-image joint embedding.
-- Independently quantized text and image codes concatenated into eight slots.
-- Independently encoded text and image vectors concatenated before four-code
-  OPQ/PQ.
-- A paired CLIP text-image alignment control.
+- `experiments/` contains the Beauty, DY, QB, and Sports generation/training
+  configurations.
+- `scripts/` contains data preparation, Qwen/Gemini embedding generation,
+  MRL-prefix derivation, OPQ construction, packing controls, plotting, and
+  merge-analysis utilities.
+- `tests/` contains focused tests for multimodal cache routing, NineRec data
+  adaptation, ActionPiece opportunity tracking, and merge analysis.
+- `results/modality_opportunities/` contains the small, machine-readable
+  summaries and report for the corrected slot-permutation analysis.
+- `plots/truncation/` contains the generated semantic-bandwidth figures.
 
-Current findings, open hypotheses, and the corresponding validation plans are
-tracked in [RESEARCH_NOTES.md](RESEARCH_NOTES.md).
+`RESEARCH_NOTES.md` is a historical working log. Generated datasets, model
+weights, dense embeddings, tokenizers, merge logs, checkpoints, credentials,
+and run logs are intentionally excluded from this repository.
 
 ## Origin and license
 

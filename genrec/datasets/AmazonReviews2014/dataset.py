@@ -469,6 +469,7 @@ class AmazonReviews2014(AbstractDataset):
         'sentence_image',
         'sentence_image_fused',
         'qwen_multimodal',
+        'qwen_image',
         'qwen_separate',
         'qwen_fused',
     ]:
