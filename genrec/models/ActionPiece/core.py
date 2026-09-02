@@ -104,6 +104,8 @@ class ActionPieceCore:
     self.metadata = metadata
     self.token2all_feat = {}
     self.token_sources = token_sources or {}
+    self.allow_cross_action_merges = True
+    self.allowed_merge_slots = None
 
     if self.state2feat is not None:
       self.n_categories, self.token2feat, self.feat2token, self.priority = (
@@ -249,20 +251,43 @@ class ActionPieceCore:
         pair2cnt (dict): The dictionary of pairs of tokens and their counts.
     """
     pair2cnt = collections.defaultdict(float)
-    for p, tk1 in enumerate(state):
-      for tk2 in state[p+1:]:
-        pair2cnt[(min(tk1, tk2), max(tk1, tk2))] += 2 / len(state)
+    eligible_state = [
+        token for token in state if self._merge_token_allowed(token)
+    ]
+    for p, tk1 in enumerate(eligible_state):
+      for tk2 in eligible_state[p+1:]:
+        pair = (min(tk1, tk2), max(tk1, tk2))
+        pair2cnt[pair] += 2 / len(eligible_state)
     return pair2cnt
 
   def _count_pairs_btw_states(self, state1, state2):
     """Iterate all the pairs of tokens between two states."""
     pair2cnt = collections.defaultdict(float)
-    for tk1 in state1:
-      for tk2 in state2:
-        pair2cnt[(min(tk1, tk2), max(tk1, tk2))] += 1 / (
-            len(state1) * len(state2)
+    if not self.allow_cross_action_merges:
+      return pair2cnt
+    eligible_state1 = [
+        token for token in state1 if self._merge_token_allowed(token)
+    ]
+    eligible_state2 = [
+        token for token in state2 if self._merge_token_allowed(token)
+    ]
+    for tk1 in eligible_state1:
+      for tk2 in eligible_state2:
+        pair = (min(tk1, tk2), max(tk1, tk2))
+        pair2cnt[pair] += 1 / (
+            len(eligible_state1) * len(eligible_state2)
         )
     return pair2cnt
+
+  def _merge_token_allowed(self, token):
+    """Return whether a token contains only merge-enabled slots."""
+    if self.allowed_merge_slots is None:
+      return True
+    slots = {
+        int(feature[0])
+        for feature in self._decode_single_token(token)
+    }
+    return slots.issubset(self.allowed_merge_slots)
 
   def _count_pairs_in_list(self, head):
     """Count the pairs of tokens in a single linked list."""
@@ -600,6 +625,9 @@ class ActionPieceCore:
         merge_type_counts['same_action'] += 1
       if not cur_node.next:
         break  # The last node
+      if not self.allow_cross_action_merges:
+        cur_node = cur_node.next.next
+        continue
       if cur_node.next.state:  # Token in context slot
         # Check (regular state, context slot)
         if self._merge_state_context(cur_node, cur_node.next, rule, new_token):
@@ -705,6 +733,8 @@ class ActionPieceCore:
       merge_log_path: str | None = None,
       merge_log_interval: int = 1,
       modality_slots: dict[str, Any] | None = None,
+      allow_cross_action_merges: bool = True,
+      allowed_merge_slots: list[int] | None = None,
   ):
     """Train the ActionPiece tokenizer.
 
@@ -716,7 +746,15 @@ class ActionPieceCore:
         merge_log_interval (int): Record every n merge steps.
         modality_slots (dict, optional): Text/image/hash slot definitions used
           to record candidate opportunity statistics before every merge.
+        allow_cross_action_merges: Whether pairs may span adjacent actions.
+        allowed_merge_slots: Optional slot allowlist for both merge operands.
     """
+    self.allow_cross_action_merges = bool(allow_cross_action_merges)
+    self.allowed_merge_slots = (
+        None
+        if allowed_merge_slots is None
+        else {int(slot) for slot in allowed_merge_slots}
+    )
     self.modality_tracking = None
     self.modality_token_kinds = {}
     if modality_slots is not None:
@@ -743,6 +781,12 @@ class ActionPieceCore:
               'initial_vocab_size': self.n_init_feats,
               'target_vocab_size': target_vocab_size,
               'n_sequences': len(token_corpus),
+              'allow_cross_action_merges': self.allow_cross_action_merges,
+              'allowed_merge_slots': (
+                  sorted(self.allowed_merge_slots)
+                  if self.allowed_merge_slots is not None
+                  else None
+              ),
               'modality_slots': (
                   {
                       'text_slots': sorted(self.modality_tracking['text_slots']),

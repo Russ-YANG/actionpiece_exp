@@ -73,6 +73,15 @@ actionpiece_vocab_size: 40000
 actionpiece_merge_log: True
 actionpiece_merge_log_interval: 1
 actionpiece_merge_log_path: ~
+# `sequence` is the original ActionPiece behavior. `item` learns and applies
+# merges only inside each history item.
+history_tokenization_scope: sequence # sequence / item
+# Keep the original merged target by default; `atomic` fixes one primitive per
+# feature slot and forces EOS after the final slot during generation.
+target_tokenization: actionpiece # actionpiece / atomic
+# Disable this for semantic-only history merges while keeping the final hash
+# slot atomic for collision-free targets.
+actionpiece_merge_hash: True
 
 # Config for the model
 num_beams: 50 # Number of beams for beam search

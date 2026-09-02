@@ -93,6 +93,41 @@ class ActionPieceModalityOpportunitiesTest(unittest.TestCase):
         sum(opportunities['candidate_priority_mass'].values()), 4.0
     )
 
+  def test_item_local_training_does_not_merge_adjacent_actions(self):
+    actionpiece = ActionPieceCore(
+        state2feat={'left': [10, 20], 'right': [11, 21]}
+    )
+    with tempfile.TemporaryDirectory() as directory:
+      log_path = Path(directory) / 'merge.jsonl'
+      actionpiece.train(
+          state_corpus=[['left', 'right']],
+          target_vocab_size=actionpiece.n_init_feats + 1,
+          merge_log_path=str(log_path),
+          allow_cross_action_merges=False,
+      )
+      records = [json.loads(line) for line in log_path.read_text().splitlines()]
+
+    self.assertFalse(records[0]['allow_cross_action_merges'])
+    self.assertEqual(records[1]['merge_type_counts'], {'same_action': 1})
+
+  def test_allowed_merge_slots_keep_hash_atomic(self):
+    actionpiece = ActionPieceCore(state2feat={'item': [10, 20, 30]})
+    with tempfile.TemporaryDirectory() as directory:
+      log_path = Path(directory) / 'merge.jsonl'
+      actionpiece.train(
+          state_corpus=[['item']],
+          target_vocab_size=actionpiece.n_init_feats + 1,
+          merge_log_path=str(log_path),
+          allowed_merge_slots=[0, 1],
+      )
+      records = [json.loads(line) for line in log_path.read_text().splitlines()]
+
+    self.assertEqual(records[0]['allowed_merge_slots'], [0, 1])
+    self.assertEqual(
+        {feature[0] for feature in records[1]['new_token_basic_features']},
+        {0, 1},
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

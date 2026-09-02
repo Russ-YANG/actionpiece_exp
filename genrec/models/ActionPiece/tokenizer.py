@@ -70,12 +70,27 @@ class ActionPieceTokenizer(AbstractTokenizer):
 
     self.item2feat = None
     self.ignored_label = -100
+    self.history_tokenization_scope = config.get(
+        'history_tokenization_scope', 'sequence'
+    )
+    self.target_tokenization = config.get(
+        'target_tokenization', 'actionpiece'
+    )
+    if self.history_tokenization_scope not in {'sequence', 'item'}:
+      raise ValueError(
+          'history_tokenization_scope must be "sequence" or "item".'
+      )
+    if self.target_tokenization not in {'actionpiece', 'atomic'}:
+      raise ValueError(
+          'target_tokenization must be "actionpiece" or "atomic".'
+      )
     self.actionpiece = self._init_tokenizer(dataset)
     self.bos_token = self.actionpiece.vocab_size
     self.eos_token = self.actionpiece.vocab_size + 1
     self.n_inference_ensemble = config['n_inference_ensemble']
     self.train_shuffle = config['train_shuffle']
     self.encoded_labels = {}
+    self.atomic_target_tokens = self._get_atomic_target_tokens()
     self.collate_fn = {
         'train': self.collate_fn_train,
         'val': self.collate_fn_val,
@@ -230,6 +245,15 @@ class ActionPieceTokenizer(AbstractTokenizer):
         f'{self.config["metadata"]}.{self._semantic_artifact_stem()}.'
         f'h{self.config["n_hash_buckets"]}'
     )
+
+  def _tokenizer_scope_suffix(self) -> str:
+    """Return a cache suffix for tokenizer-training constraints."""
+    if self.history_tokenization_scope == 'sequence':
+      return ''
+    hash_suffix = (
+        '' if self.config.get('actionpiece_merge_hash', True) else '.no_hash'
+    )
+    return f'history_{self.history_tokenization_scope}{hash_suffix}.'
 
   def _encode_sent_emb(self, dataset: AbstractDataset, output_path: str):
     """Encodes the sentence embeddings for the given dataset and saves them to the specified output path.
@@ -916,6 +940,45 @@ class ActionPieceTokenizer(AbstractTokenizer):
       state_seq.append(tokenized_feats)
     return np.array(state_seq)
 
+  def _encode_history(self, state_seq, shuffle):
+    """Encode history jointly or independently within each item."""
+    if self.history_tokenization_scope == 'sequence':
+      return self.actionpiece.encode(state_seq, shuffle=shuffle)
+    encoded = []
+    for state in state_seq:
+      encoded.extend(
+          self.actionpiece.encode(np.asarray([state]), shuffle=shuffle)
+      )
+    return encoded
+
+  def _get_atomic_target_tokens(self):
+    """Group primitive vocabulary IDs by their fixed feature slot."""
+    by_slot = [[] for _ in range(self.actionpiece.n_categories)]
+    for token, feature in enumerate(
+        self.actionpiece.vocab[: self.actionpiece.n_init_feats]
+    ):
+      slot = int(feature[0])
+      if slot >= 0:
+        by_slot[slot].append(token)
+    return tuple(tuple(tokens) for tokens in by_slot)
+
+  def target_allowed_tokens(self, step):
+    """Return allowed decoder tokens at one target step, or None."""
+    if self.target_tokenization != 'atomic':
+      return None
+    if step < self.actionpiece.n_categories:
+      return self.atomic_target_tokens[step]
+    if step == self.actionpiece.n_categories:
+      return (self.eos_token,)
+    return ()
+
+  @property
+  def generation_max_length(self):
+    """Maximum decoder length including its start token."""
+    if self.target_tokenization == 'atomic':
+      return self.actionpiece.n_categories + 2
+    return self.actionpiece.n_categories + 1
+
   def tokenize_function(
       self, example: dict[Any, Any], split: str
   ) -> dict[Any, Any]:
@@ -978,6 +1041,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
     }:
       tokenizer_filename = (
           f'actionpiece.{self._feature_artifact_stem()}.'
+          f'{self._tokenizer_scope_suffix()}'
           f'v{self.config["actionpiece_vocab_size"]}.json'
       )
     tokenizer_path = os.path.join(dataset.cache_dir, 'processed', tokenizer_filename)
@@ -1006,6 +1070,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
           }:
             merge_log_filename = (
                 f'actionpiece.{self._feature_artifact_stem()}.'
+                f'{self._tokenizer_scope_suffix()}'
                 f'v{self.config["actionpiece_vocab_size"]}.merge_log.jsonl'
             )
           merge_log_path = os.path.join(
@@ -1044,6 +1109,14 @@ class ActionPieceTokenizer(AbstractTokenizer):
           merge_log_path=merge_log_path,
           merge_log_interval=self.config['actionpiece_merge_log_interval'],
           modality_slots=modality_slots,
+          allow_cross_action_merges=(
+              self.history_tokenization_scope == 'sequence'
+          ),
+          allowed_merge_slots=(
+              list(range(actionpiece.n_categories - 1))
+              if not self.config.get('actionpiece_merge_hash', True)
+              else None
+          ),
       )
       actionpiece.save(tokenizer_path)
     return actionpiece
@@ -1057,7 +1130,9 @@ class ActionPieceTokenizer(AbstractTokenizer):
     Returns:
         encoded_labels (list[int]): The encoded labels.
     """
-    key = labels.tostring()
+    if self.target_tokenization == 'atomic':
+      return np.asarray(labels).reshape(-1).tolist()
+    key = labels.tobytes()
     if key in self.encoded_labels:
       return self.encoded_labels[key]
     encoded_labels = self.actionpiece.encode(labels, shuffle='none')
@@ -1082,7 +1157,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
       lb = data['state_seq'][-1:]
       input_ids.append(
           [self.bos_token]
-          + self.actionpiece.encode(seq, shuffle=self.train_shuffle)
+          + self._encode_history(seq, shuffle=self.train_shuffle)
           + [self.eos_token]
       )
       labels.append(self.encode_labels(lb) + [self.eos_token])
@@ -1123,7 +1198,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
       # The labels should always be encoded by encode_plus
       input_ids.append(
           [self.bos_token]
-          + self.actionpiece.encode(
+          + self._encode_history(
               seq,
               shuffle='none' if self.n_inference_ensemble == -1 else 'feature',
           )
@@ -1165,14 +1240,14 @@ class ActionPieceTokenizer(AbstractTokenizer):
       if self.n_inference_ensemble == -1:
         input_ids.append(
             [self.bos_token]
-            + self.actionpiece.encode(seq, shuffle='none')
+            + self._encode_history(seq, shuffle='none')
             + [self.eos_token]
         )
         labels.append(lb)
       for _ in range(self.n_inference_ensemble):
         input_ids.append(
             [self.bos_token]
-            + self.actionpiece.encode(seq, shuffle='feature')
+            + self._encode_history(seq, shuffle='feature')
             + [self.eos_token]
         )
       labels.append(lb)

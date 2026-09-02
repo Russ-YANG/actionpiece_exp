@@ -110,7 +110,7 @@ class ActionPiece(AbstractModel):
     outputs = self.beam_search(
         input_ids=batch['input_ids'],
         attention_mask=batch['attention_mask'],
-        max_length=self.tokenizer.actionpiece.n_categories + 1,
+        max_length=self.tokenizer.generation_max_length,
         num_beams=max(self.config['num_beams'], n_return_sequences),
         num_return_sequences=n_return_sequences,
         return_score=False,
@@ -375,6 +375,15 @@ class ActionPiece(AbstractModel):
 
     vocab_size = logits.shape[-1]
     next_token_logits = logits[:, -1, :]
+    allowed_tokens = self.tokenizer.target_allowed_tokens(
+        decoder_input_ids.shape[1] - 1
+    )
+    if allowed_tokens is not None:
+      constrained_logits = torch.full_like(next_token_logits, -torch.inf)
+      constrained_logits[:, list(allowed_tokens)] = next_token_logits[
+          :, list(allowed_tokens)
+      ]
+      next_token_logits = constrained_logits
     next_token_scores = torch.log_softmax(
         next_token_logits, dim=-1
     )  # Calculate log softmax over the last dimension
