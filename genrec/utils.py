@@ -112,6 +112,12 @@ def get_file_name(config: dict[str, Any], suffix: str = '') -> str:
   md5 = hashlib.md5(config_str.encode()).hexdigest()[:6]
   command_line_args = get_command_line_args_str()
   logfilename = f'{config["run_id"]}-{command_line_args}-{config["run_local_time"]}-{md5}-{suffix}'
+  if len(os.fsencode(logfilename)) > 240:
+    args_hash = hashlib.md5(command_line_args.encode()).hexdigest()[:8]
+    logfilename = (
+        f'{config["run_id"]}-args{args_hash}-'
+        f'{config["run_local_time"]}-{md5}-{suffix}'
+    )
   return logfilename
 
 

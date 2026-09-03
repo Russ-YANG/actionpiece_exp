@@ -40,6 +40,6 @@ actionpiece_merge_log: true
 actionpiece_merge_log_interval: 1
 tokenizer_only: false
 train_batch_size: 128
-eval_batch_size: 64
+eval_batch_size: 32
 epochs: 200
 run_id: beauty_e4_item_local_history_atomic9_target_d768_bs128
