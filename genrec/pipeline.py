@@ -16,7 +16,9 @@
 """Pipeline for ActionPiece."""
 
 import logging
+import json
 import os
+from pathlib import Path
 from typing import Any, Dict, Union
 
 import accelerate as accelerate_lib
@@ -175,18 +177,22 @@ class Pipeline:
       )
     test_dataloader = get_dataloader('test', test_batch_size, False)
 
-    self.trainer.fit(train_dataloader, val_dataloader)
+    checkpoint = self.config.get('eval_checkpoint')
+    if checkpoint is None:
+      self.trainer.fit(train_dataloader, val_dataloader)
+      checkpoint = self.trainer.saved_model_ckpt
 
     self.accelerator.wait_for_everyone()
     self.model = self.accelerator.unwrap_model(self.model)
 
-    self.model.load_state_dict(torch.load(self.trainer.saved_model_ckpt))
+    self.model.load_state_dict(torch.load(checkpoint, map_location='cpu', weights_only=True))
     self.model, test_dataloader = self.accelerator.prepare(
         self.model, test_dataloader
     )
+    self.trainer.model = self.model
     if self.accelerator.is_main_process:
       self.log(
-          f'Loaded best model checkpoint from {self.trainer.saved_model_ckpt}'
+          f'Loaded model checkpoint from {checkpoint}'
       )
     test_results = self.trainer.evaluate(test_dataloader)
 
@@ -194,6 +200,18 @@ class Pipeline:
       for key in test_results:
         self.trainer.accelerator.log({f'Test_Metric/{key}': test_results[key]})
     self.log(f'Test Results: {test_results}')
+    if self.config.get('result_path') and self.accelerator.is_main_process:
+      destination = Path(self.config['result_path'])
+      destination.parent.mkdir(parents=True, exist_ok=True)
+      result = {
+          'metrics': test_results,
+          'checkpoint': str(checkpoint),
+          'evaluation_only': self.config.get('eval_checkpoint') is not None,
+          'profile': getattr(self.trainer, 'last_eval_profile', None),
+          'train_epoch_profiles': getattr(self.trainer, 'train_epoch_profiles', []),
+          'config': utils.config_for_log(self.config),
+      }
+      destination.write_text(json.dumps(result, indent=2, default=str) + '\n')
 
     self.trainer.end()
 

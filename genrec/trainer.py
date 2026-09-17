@@ -23,6 +23,7 @@ managing resources.
 import collections
 import logging
 import os
+import time
 from typing import Any
 
 from genrec.evaluator import Evaluator
@@ -84,6 +85,8 @@ class Trainer:
     self.accelerator = config['accelerator']
     self.evaluator = Evaluator(config, tokenizer)
     self.logger = getLogger()
+    if config.get('profile_history', False) and config['use_ddp']:
+      raise ValueError('profile_history currently requires a single device.')
 
     self.saved_model_ckpt = os.path.join(
         self.config['ckpt_dir'], get_file_name(self.config, suffix='.pth')
@@ -131,9 +134,14 @@ class Trainer:
     ).astype(int)
     best_epoch = 0
     best_val_score = -1
+    self.train_epoch_profiles = []
 
     for epoch in range(n_epochs):
       # Training
+      if self.config.get('profile_history', False) and self.accelerator.device.type == 'cuda':
+        torch.cuda.synchronize(self.accelerator.device)
+        torch.cuda.reset_peak_memory_stats(self.accelerator.device)
+      epoch_started = time.perf_counter()
       self.model.train()
       total_loss = 0.0
       train_progress_bar = tqdm(
@@ -160,6 +168,19 @@ class Trainer:
           f'[Epoch {epoch + 1}] Train Loss:'
           f' {total_loss / len(train_dataloader)}'
       )
+      if self.config.get('profile_history', False):
+        device = self.accelerator.device
+        if device.type == 'cuda':
+          torch.cuda.synchronize(device)
+        epoch_profile = {
+            'epoch': epoch + 1,
+            'training_wall_seconds': time.perf_counter() - epoch_started,
+            'peak_cuda_allocated_bytes': (
+                torch.cuda.max_memory_allocated(device) if device.type == 'cuda' else None
+            ),
+        }
+        self.train_epoch_profiles.append(epoch_profile)
+        self.log(f'Training profile: {epoch_profile}')
 
       # Evaluation
       if (epoch + 1) % self.config['eval_interval'] == 0:
@@ -206,6 +227,14 @@ class Trainer:
         collections.OrderedDict: A dictionary containing the evaluation results.
     """
     self.model.eval()
+    profile = self.config.get('profile_history', False)
+    device = self.accelerator.device
+    if profile and device.type == 'cuda':
+      torch.cuda.synchronize(device)
+      torch.cuda.reset_peak_memory_stats(device)
+    started = time.perf_counter()
+    history_lengths = []
+    padded_tokens = 0
 
     all_results = collections.defaultdict(list)
     val_progress_bar = tqdm(
@@ -214,6 +243,9 @@ class Trainer:
         desc=f'Eval - {split}',
     )
     for batch in val_progress_bar:
+      if profile:
+        history_lengths.extend(batch['attention_mask'].sum(dim=1).cpu().tolist())
+        padded_tokens += batch['attention_mask'].numel()
       with torch.no_grad():
         batch = {k: v.to(self.accelerator.device) for k, v in batch.items()}
         source_id = batch.pop('source_id', None)
@@ -255,6 +287,25 @@ class Trainer:
     output_results = OrderedDict()
     for key in sorted(all_results):
       output_results[key] = torch.cat(all_results[key]).mean().item()
+    self.last_eval_profile = None
+    if profile:
+      if device.type == 'cuda':
+        torch.cuda.synchronize(device)
+      elapsed = time.perf_counter() - started
+      self.last_eval_profile = {
+          'split': split,
+          'encoder_sequences': len(history_lengths),
+          'mean_tokens_including_bos_eos': float(np.mean(history_lengths)),
+          'p95_tokens_including_bos_eos': float(np.percentile(history_lengths, 95)),
+          'padding_fraction': 1.0 - sum(history_lengths) / padded_tokens,
+          'evaluation_wall_seconds': elapsed,
+          'encoder_sequences_per_second': len(history_lengths) / elapsed,
+          'peak_cuda_allocated_bytes': (
+              torch.cuda.max_memory_allocated(device) if device.type == 'cuda' else None
+          ),
+          'timing_scope': 'Includes collation, transfer, generation and metrics; not isolated model latency.',
+      }
+      self.log(f'History profile: {self.last_eval_profile}')
     return output_results
 
   def end(self):

@@ -959,7 +959,7 @@ class ActionPieceCore:
     aug_state_seq = self._random_walk_augmentation(state_seq)
     return self._encode(aug_state_seq)
 
-  def encode(self, state_seq, shuffle='feature'):
+  def encode(self, state_seq, shuffle='feature', return_merge_path=False):
     """Encode the state sequence into a list of tokens.
 
     Args:
@@ -968,11 +968,17 @@ class ActionPieceCore:
           augmentation. 'token': enuemrate all the pairs of tokens, merge, and
           shuffle inside the state. 'none': enuemrate all the pairs of tokens,
           merge.
+        return_merge_path (bool): Return every legal intermediate segmentation,
+          from atoms to full merging. Only supported for one item with no shuffle.
 
     Returns:
         encoded_seq (list[int]):
-            The encoded state sequence.
+            The encoded state sequence, or a list of such sequences when
+            return_merge_path is True.
     """
+
+    if return_merge_path and (len(state_seq) != 1 or shuffle != 'none'):
+      raise ValueError('A merge path requires one item and shuffle="none".')
 
     def _count_inside_ll(node, updates):
       """Count the best pair of tokens inside a single state."""
@@ -1010,6 +1016,7 @@ class ActionPieceCore:
       return self.encode_fast(state_seq)
     else:
       head = self._construct_linked_list(head_id=-1, state_seq=state_seq)  # type: ignore
+      merge_path = [head.tolist()] if return_merge_path else None
       while True:
         # best_priority, node_to_update, rule_to_update
         cur_updates = (None, None, None)
@@ -1055,6 +1062,10 @@ class ActionPieceCore:
                 new_token=self.rank[rule_to_update],
             )
         head = self._merge_empty_nodes(head)
+        if return_merge_path:
+          merge_path.append(head.tolist())
+      if return_merge_path:
+        return merge_path
       if shuffle == 'token':
         return head.to_shuffled_list()
       elif shuffle == 'none':

@@ -30,6 +30,7 @@ from genrec.image_manifest import available_image_path
 from genrec.image_manifest import load_image_manifest
 from genrec.image_manifest import sha256_file
 from genrec.models.ActionPiece.core import ActionPieceCore
+from genrec.models.ActionPiece.history import ItemHistoryRepresentations, POLICIES
 from genrec.models.ActionPiece.qwen_api import QwenApiTextEncoder
 from genrec.models.ActionPiece.qwen_local import build_qwen_local_artifact_stem
 from genrec.models.ActionPiece.qwen_local import QwenLocalMultimodalEncoder
@@ -68,6 +69,35 @@ class ActionPieceTokenizer(AbstractTokenizer):
   def __init__(self, config: dict[Any, Any], dataset: AbstractDataset):
     super().__init__(config)
 
+    if config.get('semantic_cache_seed') is not None and not config.get('require_cached_item_features', False):
+      raise ValueError('semantic_cache_seed is only for reusing cached item features.')
+
+    separate_image_mode = config.get(
+        'separate_image_semantic_ids', 'learned'
+    )
+    if separate_image_mode not in {'learned', 'fixed_null'}:
+      raise ValueError(
+          'separate_image_semantic_ids must be "learned" or "fixed_null".'
+      )
+    if (
+        separate_image_mode == 'fixed_null'
+        and config['metadata'] != 'qwen_separate'
+    ):
+      raise ValueError(
+          'fixed_null image SIDs require metadata=qwen_separate.'
+      )
+    self.length_control_history_count = int(
+        config.get('length_control_history_tokens_per_item', 0)
+    )
+    self.length_control_target_count = int(
+        config.get('length_control_target_tokens', 0)
+    )
+    if (
+        self.length_control_history_count < 0
+        or self.length_control_target_count < 0
+    ):
+      raise ValueError('Length-control token counts must be non-negative.')
+
     self.item2feat = None
     self.ignored_label = -100
     self.history_tokenization_scope = config.get(
@@ -84,13 +114,60 @@ class ActionPieceTokenizer(AbstractTokenizer):
       raise ValueError(
           'target_tokenization must be "actionpiece" or "atomic".'
       )
+    self.history_granularity = config.get('history_granularity', 'legacy')
+    self.history_eval_granularity = (
+        config.get('history_eval_granularity') or self.history_granularity
+    )
+    for policy in (self.history_granularity, self.history_eval_granularity):
+      if policy not in POLICIES | {'legacy'}:
+        raise ValueError(f'Unknown history granularity: {policy}')
+    self.use_history_candidates = self.history_granularity != 'legacy'
+    if self.use_history_candidates:
+      if self.history_tokenization_scope != 'item' or self.target_tokenization != 'atomic':
+        raise ValueError('Granularity pilots require item scope and atomic targets.')
+      if config.get('actionpiece_merge_hash', True):
+        raise ValueError('Granularity pilots require actionpiece_merge_hash=false.')
+      if config['train_shuffle'] != 'none' or config['n_inference_ensemble'] != -1:
+        raise ValueError('Granularity pilots require train_shuffle=none and n_inference_ensemble=-1.')
+      if self.history_eval_granularity == 'legacy':
+        raise ValueError('Pilot evaluation must use raw/full/middle/random.')
+    elif self.history_eval_granularity != 'legacy':
+      raise ValueError('Set history_granularity before overriding evaluation policy.')
+    # Sampling does not consume the backbone initialization RNG. Under DDP,
+    # workers receive separate training streams; evaluation is history-keyed.
+    rank = config['accelerator'].process_index
+    self.history_train_rng = np.random.default_rng(
+        np.random.SeedSequence([config['rand_seed'], rank])
+    )
+    self.history_eval_seed = config.get('history_eval_seed', 2024)
     self.actionpiece = self._init_tokenizer(dataset)
     self.bos_token = self.actionpiece.vocab_size
     self.eos_token = self.actionpiece.vocab_size + 1
+    next_token = self.eos_token + 1
+    self.length_control_history_tokens = tuple(
+        range(next_token, next_token + self.length_control_history_count)
+    )
+    next_token += self.length_control_history_count
+    self.length_control_target_tokens = tuple(
+        range(next_token, next_token + self.length_control_target_count)
+    )
     self.n_inference_ensemble = config['n_inference_ensemble']
     self.train_shuffle = config['train_shuffle']
     self.encoded_labels = {}
     self.atomic_target_tokens = self._get_atomic_target_tokens()
+    if self.use_history_candidates:
+      states = [self._tokenize_once([item])[0] for item in self.item2feat]
+      with config['accelerator'].main_process_first():
+        self.history_candidates = ItemHistoryRepresentations(
+            self.actionpiece, states,
+            cache_path=self.actionpiece_path + '.history_candidates.json',
+        )
+      summary = self.history_candidates.summary()
+      self.logger.info('[HISTORY CANDIDATES] %s', json.dumps(summary))
+      report = config.get('history_candidate_report')
+      if report and config['accelerator'].is_main_process:
+        Path(report).parent.mkdir(parents=True, exist_ok=True)
+        Path(report).write_text(json.dumps(summary, indent=2) + '\n')
     self.collate_fn = {
         'train': self.collate_fn_train,
         'val': self.collate_fn_val,
@@ -102,6 +179,11 @@ class ActionPieceTokenizer(AbstractTokenizer):
     if isinstance(item_meta, dict):
       return item_meta['sentence']
     return item_meta
+
+  @property
+  def semantic_cache_seed(self):
+    seed = self.config.get('semantic_cache_seed')
+    return self.config['rand_seed'] if seed is None else seed
 
   def _sent_artifact_stem(self) -> str:
     """Return a cache-safe sentence encoder identity."""
@@ -149,7 +231,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
         f'{self._sent_artifact_stem()}.'
         f'opq{self.config["pq_n_codebooks"]}x'
         f'{self.config["pq_codebook_size"]}.'
-        f'seed{self.config["rand_seed"]}'
+        f'seed{self.semantic_cache_seed}'
     )
     variant = self.config.get('semantic_id_variant')
     if variant:
@@ -189,7 +271,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
         f'w{image_weight}.'
         f'opq{self.config["pq_n_codebooks"]}x'
         f'{self.config["pq_codebook_size"]}.'
-        f'seed{self.config["rand_seed"]}'
+        f'seed{self.semantic_cache_seed}'
     )
 
   def _image_semantic_artifact_stem(self) -> str:
@@ -198,7 +280,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
         f'{self._qwen_image_artifact_stem()}.'
         f'opq{self.config["image_pq_n_codebooks"]}x'
         f'{self.config["image_pq_codebook_size"]}.'
-        f'seed{self.config["rand_seed"]}'
+        f'seed{self.semantic_cache_seed}'
     )
     variant = self.config.get('semantic_id_variant')
     if variant:
@@ -206,8 +288,8 @@ class ActionPieceTokenizer(AbstractTokenizer):
       stem = f'{stem}.{safe_variant}'
     return stem
 
-  def _separate_feature_artifact_stem(self) -> str:
-    """Return the E4 identity without creating overlong cache filenames."""
+  def _learned_separate_feature_artifact_stem(self) -> str:
+    """Return the original E4 feature identity."""
     text_identity = hashlib.sha256(
         self._semantic_artifact_stem().encode('utf-8')
     ).hexdigest()[:12]
@@ -222,7 +304,25 @@ class ActionPieceTokenizer(AbstractTokenizer):
         f'{self.config["pq_codebook_size"]}.'
         f'iopq{self.config["image_pq_n_codebooks"]}x'
         f'{self.config["image_pq_codebook_size"]}.'
-        f'seed{self.config["rand_seed"]}.'
+        f'seed{self.semantic_cache_seed}.'
+        f'h{self.config["n_hash_buckets"]}'
+    )
+
+  def _separate_feature_artifact_stem(self) -> str:
+    """Return the E4 identity without creating overlong cache filenames."""
+    if self.config.get('separate_image_semantic_ids') != 'fixed_null':
+      return self._learned_separate_feature_artifact_stem()
+    text_identity = hashlib.sha256(
+        self._semantic_artifact_stem().encode('utf-8')
+    ).hexdigest()[:12]
+    null_code = int(self.config['image_pq_codebook_size'])
+    return (
+        f'qwen_separate.{os.path.basename(self.config["sent_emb_model"])}.'
+        f't{self.config["sent_emb_dim"]}.th{text_identity}.'
+        f'inull{self.config["image_pq_n_codebooks"]}x{null_code}.'
+        f'topq{self.config["pq_n_codebooks"]}x'
+        f'{self.config["pq_codebook_size"]}.'
+        f'seed{self.semantic_cache_seed}.'
         f'h{self.config["n_hash_buckets"]}'
     )
 
@@ -738,6 +838,42 @@ class ActionPieceTokenizer(AbstractTokenizer):
         for k, v in item2sem_ids.items()
     }
 
+  def _get_fixed_null_features(
+      self, dataset: AbstractDataset
+  ) -> dict[Any, Any]:
+    """Build Text OPQ4 + NULL4 from the exact original E4 feature cache."""
+    source_path = os.path.join(
+        dataset.cache_dir,
+        f'processed/item.{self._learned_separate_feature_artifact_stem()}.feat',
+    )
+    if not os.path.exists(source_path):
+      raise FileNotFoundError(
+          'E4-Zero requires the original E4 item-feature cache so it can '
+          f'reuse the exact text codes: {source_path}'
+      )
+    self.logger.info(
+        '[TOKENIZER] Building E4-Zero from original E4 features at %s...',
+        source_path,
+    )
+    with open(source_path, 'r') as f:
+      source_features = json.load(f)
+    text_slots = int(self.config['pq_n_codebooks'])
+    image_slots = int(self.config['image_pq_n_codebooks'])
+    null_code = int(self.config['image_pq_codebook_size'])
+    expected_source_slots = text_slots + image_slots + 1
+    item2feat = {}
+    for item, features in source_features.items():
+      if len(features) != expected_source_slots:
+        raise ValueError(
+            'Original E4 feature width does not match Text OPQ + Image OPQ + '
+            f'hash: item={item}, got={len(features)}, '
+            f'expected={expected_source_slots}'
+        )
+      item2feat[item] = tuple(features[:text_slots]) + (
+          (null_code,) * image_slots
+      )
+    return self._get_hashed_feat(dataset, item2feat)
+
   def _normalize_embs(self, embs: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(embs, axis=-1, keepdims=True)
     norms = np.maximum(norms, 1e-12)
@@ -874,6 +1010,20 @@ class ActionPieceTokenizer(AbstractTokenizer):
       with open(feat_path, 'r') as f:
         item2feat = json.load(f)
       return item2feat
+    if self.config.get('require_cached_item_features', False):
+      raise FileNotFoundError(
+          f'Pilot requires existing item features: {feat_path}. '
+          'Check the cache/config; embeddings and SIDs will not be regenerated.'
+      )
+    if (
+        self.config['metadata'] == 'qwen_separate'
+        and self.config.get('separate_image_semantic_ids') == 'fixed_null'
+    ):
+      item2hashed_feat = self._get_fixed_null_features(dataset)
+      self.logger.info(f'[TOKENIZER] Saving item features to {feat_path}...')
+      with open(feat_path, 'w') as f:
+        json.dump(item2hashed_feat, f)
+      return item2hashed_feat
     self.logger.info('[TOKENIZER] Generating item features...')
     if self.config['metadata'] == 'qwen_image':
       item2sem_ids = self._get_image_sem_ids(dataset)
@@ -940,8 +1090,18 @@ class ActionPieceTokenizer(AbstractTokenizer):
       state_seq.append(tokenized_feats)
     return np.array(state_seq)
 
-  def _encode_history(self, state_seq, shuffle):
+  def _encode_history(self, state_seq, shuffle, training=False):
     """Encode history jointly or independently within each item."""
+    if self.use_history_candidates:
+      policy = self.history_granularity if training else self.history_eval_granularity
+      rng = self.history_train_rng
+      if not training and policy == 'random':
+        # Only the observed history and an explicit evaluation seed affect this
+        # draw. Batch size/order, target labels and prior validation calls do not.
+        rng = np.random.default_rng(np.random.SeedSequence(
+            [self.history_eval_seed] + np.asarray(state_seq).reshape(-1).tolist()
+        ))
+      return self.history_candidates.encode(state_seq, policy, rng)
     if self.history_tokenization_scope == 'sequence':
       return self.actionpiece.encode(state_seq, shuffle=shuffle)
     encoded = []
@@ -968,7 +1128,10 @@ class ActionPieceTokenizer(AbstractTokenizer):
       return None
     if step < self.actionpiece.n_categories:
       return self.atomic_target_tokens[step]
-    if step == self.actionpiece.n_categories:
+    extra_step = step - self.actionpiece.n_categories
+    if extra_step < self.length_control_target_count:
+      return (self.length_control_target_tokens[extra_step],)
+    if extra_step == self.length_control_target_count:
       return (self.eos_token,)
     return ()
 
@@ -976,8 +1139,19 @@ class ActionPieceTokenizer(AbstractTokenizer):
   def generation_max_length(self):
     """Maximum decoder length including its start token."""
     if self.target_tokenization == 'atomic':
-      return self.actionpiece.n_categories + 2
-    return self.actionpiece.n_categories + 1
+      return (
+          self.actionpiece.n_categories
+          + self.length_control_target_count
+          + 2
+      )
+    return (
+        self.actionpiece.n_categories
+        + self.length_control_target_count
+        + 1
+    )
+
+  def _history_length_control_suffix(self, n_items):
+    return list(self.length_control_history_tokens) * int(n_items)
 
   def tokenize_function(
       self, example: dict[Any, Any], split: str
@@ -1016,12 +1190,24 @@ class ActionPieceTokenizer(AbstractTokenizer):
 
   @property
   def vocab_size(self):
-    return self.eos_token + 1
+    return (
+        self.eos_token
+        + self.length_control_history_count
+        + self.length_control_target_count
+        + 1
+    )
 
   @property
   def max_token_seq_len(self):
     # +2 for EOS and BOS
-    return self.actionpiece.n_categories * self.config['max_item_seq_len'] + 2
+    return (
+        (
+            self.actionpiece.n_categories
+            + self.length_control_history_count
+        )
+        * self.config['max_item_seq_len']
+        + 2
+    )
 
   def _init_tokenizer(self, dataset: AbstractDataset):
     self.item2feat = self._get_item2feat(dataset)
@@ -1045,6 +1231,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
           f'v{self.config["actionpiece_vocab_size"]}.json'
       )
     tokenizer_path = os.path.join(dataset.cache_dir, 'processed', tokenizer_filename)
+    self.actionpiece_path = tokenizer_path
     if os.path.exists(tokenizer_path):
       # If trained tokenizer exists, load it
       self.logger.info(
@@ -1157,10 +1344,15 @@ class ActionPieceTokenizer(AbstractTokenizer):
       lb = data['state_seq'][-1:]
       input_ids.append(
           [self.bos_token]
-          + self._encode_history(seq, shuffle=self.train_shuffle)
+          + self._encode_history(seq, shuffle=self.train_shuffle, training=True)
+          + self._history_length_control_suffix(len(seq))
           + [self.eos_token]
       )
-      labels.append(self.encode_labels(lb) + [self.eos_token])
+      labels.append(
+          self.encode_labels(lb)
+          + list(self.length_control_target_tokens)
+          + [self.eos_token]
+      )
     seq_lens = [len(ids) for ids in input_ids]
     max_seq_len = max(seq_lens)
     for i in range(len(batch)):
@@ -1171,7 +1363,10 @@ class ActionPieceTokenizer(AbstractTokenizer):
           [1] * seq_lens[i] + [0] * (max_seq_len - seq_lens[i])
       )
       labels[i] = labels[i] + [self.ignored_label] * (
-          self.actionpiece.n_categories + 1 - len(labels[i])
+          self.actionpiece.n_categories
+          + self.length_control_target_count
+          + 1
+          - len(labels[i])
       )
     return {
         'input_ids': torch.LongTensor(input_ids),
@@ -1202,6 +1397,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
               seq,
               shuffle='none' if self.n_inference_ensemble == -1 else 'feature',
           )
+          + self._history_length_control_suffix(len(seq))
           + [self.eos_token]
       )
       labels.append(lb)
@@ -1241,13 +1437,14 @@ class ActionPieceTokenizer(AbstractTokenizer):
         input_ids.append(
             [self.bos_token]
             + self._encode_history(seq, shuffle='none')
+            + self._history_length_control_suffix(len(seq))
             + [self.eos_token]
         )
-        labels.append(lb)
       for _ in range(self.n_inference_ensemble):
         input_ids.append(
             [self.bos_token]
             + self._encode_history(seq, shuffle='feature')
+            + self._history_length_control_suffix(len(seq))
             + [self.eos_token]
         )
       labels.append(lb)

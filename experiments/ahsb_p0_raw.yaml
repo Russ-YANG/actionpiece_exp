@@ -1,0 +1,5 @@
+# Load after ahsb_beauty_common.yaml.
+history_granularity: raw
+history_eval_granularity: raw
+run_id: ahsb_beauty_p0_raw
+result_path: results/ahsb/p0_raw_seed2024.json

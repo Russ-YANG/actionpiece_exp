@@ -64,6 +64,15 @@ pq_n_codebooks: 4
 pq_codebook_size: 256
 image_pq_n_codebooks: 4
 image_pq_codebook_size: 256
+# For metadata=qwen_separate, replace learned image SIDs with one fixed NULL
+# code per image slot. The NULL value is image_pq_codebook_size, immediately
+# outside the learned code range [0, image_pq_codebook_size - 1].
+separate_image_semantic_ids: learned # learned / fixed_null
+# Post-tokenization length controls. History tokens are appended once per
+# observed item and target tokens are inserted immediately before EOS. These
+# tokens never participate in ActionPiece vocabulary construction or merging.
+length_control_history_tokens_per_item: 0
+length_control_target_tokens: 0
 # Optional cache identity for precomputed semantic-ID transformations.
 semantic_id_variant: ~
 n_hash_buckets: 128
@@ -83,8 +92,21 @@ target_tokenization: actionpiece # actionpiece / atomic
 # slot atomic for collision-free targets.
 actionpiece_merge_hash: True
 
+# Opt-in P0/P1/P2 controls. All policies use one item-local vocabulary.
+# `legacy` preserves the original encoder behavior. `random` samples uniformly
+# over attainable merge depths, not over invented fixed 1/2/4-token bins.
+history_granularity: legacy # legacy / raw / full / middle / random
+history_eval_granularity: ~ # Defaults to history_granularity
+history_eval_seed: 2024 # Reproducible history-only random evaluation
+history_candidate_report: ~ # Optional catalog candidate-summary JSON
+require_cached_item_features: False
+semantic_cache_seed: ~ # Lookup existing SID/feature artifacts across model seeds
+
 # Config for the model
 num_beams: 50 # Number of beams for beam search
+# Preserve historical results by default. eos_aware scores through the first
+# EOS and archives completed candidates without expanding them further.
+beam_search_mode: legacy # legacy / eos_aware
 n_inference_ensemble: 5 # Number of inference ensemble
 train_shuffle: feature # none / feature / token
 

@@ -57,6 +57,9 @@ class ActionPiece(AbstractModel):
 
     self.t5 = T5ForConditionalGeneration(config=t5config)
     self.n_inference_ensemble = config['n_inference_ensemble']
+    self.beam_search_mode = config.get('beam_search_mode', 'legacy')
+    if self.beam_search_mode not in ('legacy', 'eos_aware'):
+      raise ValueError('beam_search_mode must be legacy or eos_aware')
 
   @property
   def n_parameters(self) -> str:
@@ -87,8 +90,75 @@ class ActionPiece(AbstractModel):
             - loss (torch.Tensor)
             - logits (torch.Tensor)
     """
-    outputs = self.t5(**batch)
+    if self.tokenizer.target_tokenization != 'atomic':
+      return self.t5(**batch)
+    # Build teacher-forcing inputs from the original labels, but do not compute
+    # T5's unconstrained full-vocabulary CE only to discard it afterwards.
+    labels = batch['labels']
+    inputs = {key: value for key, value in batch.items() if key != 'labels'}
+    if 'decoder_input_ids' not in inputs:
+      inputs['decoder_input_ids'] = self.t5.prepare_decoder_input_ids_from_labels(labels)
+    outputs = self.t5(**inputs)
+    constrained = torch.stack([
+        self._mask_target_logits(
+            outputs.logits[:, step, :], step,
+            inputs['decoder_input_ids'][:, :step + 1],
+        )
+        for step in range(outputs.logits.shape[1])
+    ], dim=1)
+    outputs.logits = constrained
+    outputs.loss = torch.nn.functional.cross_entropy(
+        constrained.reshape(-1, constrained.shape[-1]), labels.reshape(-1),
+        ignore_index=-100,
+    )
     return outputs
+
+  def _mask_target_logits(self, logits, step, decoder_input_ids=None):
+    """Apply the same slot grammar to training and beam-search scores."""
+    allowed = self.tokenizer.target_allowed_tokens(step)
+    if allowed is None:
+      history_tokens = self.tokenizer.length_control_history_tokens
+      target_tokens = self.tokenizer.length_control_target_tokens
+      if history_tokens or target_tokens:
+        logits = logits.clone()
+      if history_tokens:
+        logits[..., list(history_tokens)] = -torch.inf
+      if target_tokens:
+        if decoder_input_ids is None:
+          raise ValueError('Decoder prefix is required for target length control.')
+        target_ids = torch.as_tensor(
+            target_tokens, device=decoder_input_ids.device
+        )
+        progress = decoder_input_ids[:, 1:].unsqueeze(-1).eq(
+            target_ids
+        ).any(dim=-1).sum(dim=-1)
+
+        waiting_rows = torch.nonzero(progress == 0, as_tuple=True)[0]
+        logits[waiting_rows, self.tokenizer.eos_token] = -torch.inf
+        logits[
+            waiting_rows[:, None], target_ids[None, 1:]
+        ] = -torch.inf
+
+        active_rows = torch.nonzero(
+            (progress > 0) & (progress < len(target_tokens)), as_tuple=True
+        )[0]
+        next_tokens = target_ids[progress[active_rows]]
+        next_scores = logits[active_rows, next_tokens].clone()
+        logits[active_rows, :] = -torch.inf
+        logits[active_rows, next_tokens] = next_scores
+
+        finished_rows = torch.nonzero(
+            progress >= len(target_tokens), as_tuple=True
+        )[0]
+        eos_scores = logits[
+            finished_rows, self.tokenizer.eos_token
+        ].clone()
+        logits[finished_rows, :] = -torch.inf
+        logits[finished_rows, self.tokenizer.eos_token] = eos_scores
+      return logits
+    masked = torch.full_like(logits, -torch.inf)
+    masked[..., list(allowed)] = logits[..., list(allowed)]
+    return masked
 
   def generate(self, batch: dict[Any, Any], n_return_sequences: int = 1):
     """Ensembles the outputs of multiple random walk augmented inputs by their ranking scores (nDCG).
@@ -123,7 +193,18 @@ class ActionPiece(AbstractModel):
         idx = output.index(self.tokenizer.eos_token)
         output = output[:idx]
       else:
-        output = output[: self.tokenizer.actionpiece.n_categories]
+        output = output[:
+            self.tokenizer.actionpiece.n_categories
+            + self.tokenizer.length_control_target_count
+        ]
+      target_suffix = list(self.tokenizer.length_control_target_tokens)
+      if target_suffix:
+        if output[-len(target_suffix):] != target_suffix:
+          decoded_outputs.append(
+              [-1] * self.tokenizer.actionpiece.n_categories
+          )
+          continue
+        output = output[:-len(target_suffix)]
       # The output is valid when it can be decoded to a single state,
       # otherwise set to -1
       decoded_output = self.tokenizer.actionpiece.decode_single_state(output)
@@ -170,15 +251,10 @@ class ActionPiece(AbstractModel):
 
     Perform beam search to generate sequences using the specified model.
 
-    This implementation does not include stopping conditions based on
-    end-of-sequence (EOS) tokens. Instead, the
-    sequence generation is controlled solely by the `max_length` parameter.
-
-    In scenarios where the generation should explicitly detect and respond
-    to EOS tokens to terminate the sequence early, this function would need
-    modifications. In the current setup, setting `max_length` to a suitable
-    fixed value (e.g., 6) can serve the purpose by limiting the maximum sequence
-    length.
+    The default `legacy` mode keeps the original fixed-length search unchanged.
+    Opt-in `eos_aware` mode archives completed hypotheses with their score at
+    the first EOS, and only expands unfinished prefixes. Both modes rank by
+    cumulative constrained log probability, without length normalization.
 
     Args:
       input_ids (torch.Tensor): Tensor of input ids.
@@ -188,7 +264,10 @@ class ActionPiece(AbstractModel):
       num_beams (int): Number of beams for beam search.
       num_return_sequences (int): Number of sequences to return.
       return_score (bool): If True, returns a tuple of (sequences, scores) where
-        'scores' are the average log likelihood of the returned sequences.
+        scores are cumulative log probability divided by the common horizon
+        `max_length - 1`, preserving the legacy return convention. This is not
+        an average over each hypothesis's actual length and does not affect
+        ranking. In EOS-aware mode, post-EOS padding contributes no score.
 
     Returns:
       torch.Tensor: The final decoder input ids from the beam search, or a tuple
@@ -199,6 +278,12 @@ class ActionPiece(AbstractModel):
       sequences = beam_search(model, input_ids, attention_mask, max_length=6,
       num_beams=5, num_return_sequences=5)
     """
+
+    if self.beam_search_mode == 'eos_aware':
+      return self._beam_search_eos_aware(
+          input_ids, attention_mask, max_length, num_beams,
+          num_return_sequences, return_score,
+      )
 
     batch_size = input_ids.shape[0]
 
@@ -246,6 +331,110 @@ class ActionPiece(AbstractModel):
       ] / (decoder_input_ids.shape[1] - 1)
 
     return decoder_input_ids[selection_mask.view(-1), :]
+
+  @torch.no_grad()
+  def _beam_search_eos_aware(
+      self, input_ids, attention_mask, max_length, num_beams,
+      num_return_sequences, return_score,
+  ):
+    """Keep B live prefixes and an independent top-B completion archive.
+
+    Every EOS extension of a live prefix competes for the archive; EOS is
+    scored normally but never expanded. Non-EOS extensions compete for B live
+    slots. Thus completed hypotheses cannot be lost merely because a live
+    prefix temporarily scores higher, and EOS continuations cannot duplicate
+    a completed hypothesis. This changes candidate retention versus legacy,
+    not the pre-EOS logits, grammar, or item-level postprocessing.
+
+    At the horizon, unfinished candidates still compete with finished ones,
+    preserving legacy's ability to decode a full item without a final EOS.
+    Returns a fixed padded shape; unreachable slots are empty EOS sequences.
+    """
+    if max_length < 2 or not 1 <= num_return_sequences <= num_beams:
+      raise ValueError('Require max_length >= 2 and 1 <= returns <= beams')
+    batch_size = input_ids.shape[0]
+    (
+        input_ids, attention_mask, decoder_input_ids, beam_scores,
+        beam_idx_offset,
+    ) = self.prepare_beam_search_inputs(
+        input_ids, attention_mask, batch_size, num_beams
+    )
+    # Only one root per example is reachable, even with a narrow grammar.
+    beam_scores = beam_scores.view(batch_size, num_beams)
+    beam_scores[:, 1:] = -torch.inf
+    beam_scores = beam_scores.reshape(-1)
+    encoder_outputs = self.t5.get_encoder()(
+        input_ids=input_ids, attention_mask=attention_mask, return_dict=True
+    )
+    eos = self.tokenizer.eos_token
+    pad = self.tokenizer.padding_token
+    finished_ids = torch.full(
+        (batch_size, num_beams, max_length), pad,
+        dtype=torch.long, device=input_ids.device,
+    )
+    finished_scores = beam_scores.new_full((batch_size, num_beams), -torch.inf)
+
+    while decoder_input_ids.shape[1] < max_length:
+      outputs = self.t5(
+          encoder_outputs=encoder_outputs, attention_mask=attention_mask,
+          decoder_input_ids=decoder_input_ids,
+      )
+      logits = self._mask_target_logits(
+          outputs.logits[:, -1, :], decoder_input_ids.shape[1] - 1,
+          decoder_input_ids,
+      )
+      # Dead slots keep tensor shapes stable but never acquire finite scores.
+      logits = logits.masked_fill(~torch.isfinite(beam_scores[:, None]), 0.0)
+      scores = torch.log_softmax(logits, dim=-1) + beam_scores[:, None]
+      vocab_size = scores.shape[-1]
+      scores = scores.view(batch_size, num_beams, vocab_size)
+      prefix_length = decoder_input_ids.shape[1]
+
+      completed = torch.full_like(finished_ids, pad)
+      completed[:, :, :prefix_length] = decoder_input_ids.view(
+          batch_size, num_beams, prefix_length
+      )
+      completed[:, :, prefix_length] = eos
+      archive_scores = torch.cat((finished_scores, scores[:, :, eos]), dim=1)
+      archive_ids = torch.cat((finished_ids, completed), dim=1)
+      finished_scores, indices = archive_scores.topk(num_beams, dim=1)
+      finished_ids = archive_ids.gather(
+          1, indices[:, :, None].expand(-1, -1, max_length)
+      )
+
+      scores[:, :, eos] = -torch.inf
+      live_scores, tokens = scores.reshape(batch_size, -1).topk(num_beams, dim=1)
+      parents = torch.div(tokens, vocab_size, rounding_mode='floor').reshape(-1)
+      next_tokens = (tokens % vocab_size).reshape(-1)
+      decoder_input_ids = torch.cat((
+          decoder_input_ids[parents + beam_idx_offset], next_tokens[:, None],
+      ), dim=1)
+      beam_scores = live_scores.reshape(-1)
+      if not torch.isfinite(beam_scores).any():
+        break
+
+    live_ids = torch.full_like(finished_ids, pad)
+    live_ids[:, :, :decoder_input_ids.shape[1]] = decoder_input_ids.view(
+        batch_size, num_beams, -1
+    )
+    candidate_ids = torch.cat((finished_ids, live_ids), dim=1)
+    candidate_scores = torch.cat((
+        finished_scores, beam_scores.view(batch_size, num_beams),
+    ), dim=1)
+    selected_scores, indices = candidate_scores.topk(num_return_sequences, dim=1)
+    selected_ids = candidate_ids.gather(
+        1, indices[:, :, None].expand(-1, -1, max_length)
+    )
+    # Do not fabricate duplicate items if the grammar yields fewer than K paths.
+    empty = torch.full_like(selected_ids, pad)
+    empty[:, :, 0] = self.t5.config.decoder_start_token_id
+    empty[:, :, 1] = eos
+    selected_ids = torch.where(
+        torch.isfinite(selected_scores[:, :, None]), selected_ids, empty
+    ).reshape(-1, max_length)
+    if return_score:
+      return selected_ids, selected_scores.reshape(-1) / (max_length - 1)
+    return selected_ids
 
   def prepare_beam_search_inputs(
       self,
@@ -375,15 +564,9 @@ class ActionPiece(AbstractModel):
 
     vocab_size = logits.shape[-1]
     next_token_logits = logits[:, -1, :]
-    allowed_tokens = self.tokenizer.target_allowed_tokens(
-        decoder_input_ids.shape[1] - 1
+    next_token_logits = self._mask_target_logits(
+        next_token_logits, decoder_input_ids.shape[1] - 1, decoder_input_ids
     )
-    if allowed_tokens is not None:
-      constrained_logits = torch.full_like(next_token_logits, -torch.inf)
-      constrained_logits[:, list(allowed_tokens)] = next_token_logits[
-          :, list(allowed_tokens)
-      ]
-      next_token_logits = constrained_logits
     next_token_scores = torch.log_softmax(
         next_token_logits, dim=-1
     )  # Calculate log softmax over the last dimension

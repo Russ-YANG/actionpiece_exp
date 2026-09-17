@@ -1,0 +1,6 @@
+# Random training; deterministic full merging for checkpoint selection/testing.
+# Re-evaluate the saved checkpoint with raw/middle/random separately.
+history_granularity: random
+history_eval_granularity: full
+run_id: ahsb_beauty_p2_random
+result_path: results/ahsb/p2_random_seed2024.json
