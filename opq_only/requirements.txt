@@ -1,0 +1,3 @@
+# CPU only; pinned to the environment actually tested locally.
+numpy==1.25.2
+faiss-cpu==1.8.0

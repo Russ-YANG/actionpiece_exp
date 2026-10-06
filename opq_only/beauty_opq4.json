@@ -1,0 +1,16 @@
+{
+  "embedding_path": "cache/AmazonReviews2014/Beauty/processed/qwen_local.Qwen3-VL-Embedding-8B.d768.i711daf44f948.r2c4565515e0f.c393e2978d278.m2048.tbfloat16.asdpa.sent_emb",
+  "embedding_manifest_path": "cache/AmazonReviews2014/Beauty/processed/qwen_local.Qwen3-VL-Embedding-8B.d768.i711daf44f948.r2c4565515e0f.c393e2978d278.m2048.tbfloat16.asdpa.sent_emb.manifest.json",
+  "id_mapping_path": "cache/AmazonReviews2014/Beauty/processed/id_mapping.json",
+  "item_seqs_path": "cache/AmazonReviews2014/Beauty/processed/all_item_seqs.json",
+  "dimension": 768,
+  "n_codebooks": 4,
+  "codebook_size": 256,
+  "seed": 2024,
+  "threads": 4,
+  "encoder": "Qwen/Qwen3-VL-Embedding-8B",
+  "preprocessing": "truncate_then_l2",
+  "split_rule": "leave_one_out_sequence_minus_last_two",
+  "output_dir": "results/opq_only/beauty_local8b_d768_opq4_seed2024",
+  "verbose": true
+}

@@ -49,8 +49,39 @@ def atomic_json_dump(value: object, path: Path) -> None:
     raise
 
 
+def create_quantizer(dimension: int, n_codebooks: int, codebook_size: int, seed: int):
+  """Same seeded OPQ/IVF1/PQ path as the independent historical builder."""
+  if codebook_size != 256:
+    raise ValueError("Only 256-word codebooks are supported (one byte per code).")
+  if n_codebooks <= 0 or dimension <= 0 or dimension % n_codebooks:
+    raise ValueError("dimension must be positive and divisible by n_codebooks")
+  factory = f"OPQ{n_codebooks},IVF1,PQ{n_codebooks}x8"
+  index = faiss.index_factory(
+      dimension, factory, faiss.METRIC_INNER_PRODUCT
+  )
+  # NumPy's RNG does not control Faiss clustering. Explicitly seed the
+  # coarse quantizer, the final IVF-PQ, and the PQ used while learning the
+  # OPQ rotation so the filename's seed describes the actual artifact.
+  opq = faiss.downcast_VectorTransform(index.chain.at(0))
+  opq_training_pq = faiss.ProductQuantizer(
+      dimension,
+      n_codebooks,
+      int(np.log2(codebook_size)),
+  )
+  opq_training_pq.cp.seed = seed
+  opq.pq = opq_training_pq
+  ivf_index = faiss.downcast_index(index.index)
+  ivf_index.cp.seed = seed
+  ivf_index.pq.cp.seed = seed
+  return index, opq, ivf_index, opq_training_pq
+
+
 def main() -> None:
   args = parse_args()
+  if args.threads <= 0:
+    raise ValueError("threads must be positive")
+  if args.codebook_size != 256:
+    raise ValueError("Only codebook_size=256 is supported")
   np.random.seed(args.seed)
   faiss.omp_set_num_threads(args.threads)
 
@@ -98,23 +129,9 @@ def main() -> None:
   )
   print(f'training Faiss index: {factory}', flush=True)
   started = time.time()
-  index = faiss.index_factory(
-      args.dimension, factory, faiss.METRIC_INNER_PRODUCT
+  index, opq, ivf_index, opq_training_pq = create_quantizer(
+      args.dimension, args.n_codebooks, args.codebook_size, args.seed
   )
-  # NumPy's RNG does not control Faiss clustering. Explicitly seed the
-  # coarse quantizer, the final IVF-PQ, and the PQ used while learning the
-  # OPQ rotation so the filename's seed describes the actual artifact.
-  opq = faiss.downcast_VectorTransform(index.chain.at(0))
-  opq_training_pq = faiss.ProductQuantizer(
-      args.dimension,
-      args.n_codebooks,
-      int(np.log2(args.codebook_size)),
-  )
-  opq_training_pq.cp.seed = args.seed
-  opq.pq = opq_training_pq
-  ivf_index = faiss.downcast_index(index.index)
-  ivf_index.cp.seed = args.seed
-  ivf_index.pq.cp.seed = args.seed
   if args.verbose:
     # Expose otherwise silent OPQ/PQ clustering progress when diagnosing a
     # slow training run.

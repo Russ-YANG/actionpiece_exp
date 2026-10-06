@@ -1,0 +1,14 @@
+{
+  "embedding_path": "<NEW_ALIGNED_EMBEDDING_F32>",
+  "embedding_manifest_path": "<NEW_EMBEDDING_MANIFEST_JSON>",
+  "id_mapping_path": "<NEW_ID_MAPPING_JSON>",
+  "dimension": 768,
+  "n_codebooks": 4,
+  "codebook_size": 256,
+  "seed": 2024,
+  "threads": 4,
+  "encoder": "Qwen/Qwen3-VL-Embedding-8B",
+  "preprocessing": "truncate_then_l2",
+  "output_dir": "results/opq_only/new_items_encoded",
+  "quantizer_dir": "results/opq_only/beauty_local8b_d768_opq4_seed2024"
+}
