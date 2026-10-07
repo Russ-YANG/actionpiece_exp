@@ -152,13 +152,13 @@ def main():
         raise RuntimeError("smoke/train must run inside a Slurm allocation")
     torch.set_num_threads(int(os.environ.get("SLURM_CPUS_PER_TASK", "1")))
 
+    from genrec.pipeline import Pipeline
     import genrec.datasets as dataset_registry
     import genrec.models as model_registry
     from genrec.dataset import AbstractDataset
     from genrec.models.ActionPiece.tokenizer import ActionPieceTokenizer
     from genrec.models.ActionPiece.model import ActionPiece
     from genrec.models.ActionPiece.core import ActionPieceCore
-    from genrec.pipeline import Pipeline
 
     def forbidden(*args, **kwargs):
         raise RuntimeError("MERGE_CORE_FORBIDDEN")
