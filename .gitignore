@@ -19,3 +19,5 @@ merge_logs/
 .DS_Store
 __pycache__/
 *.pyc
+/results/opq_baseline/
+/results/opq_only/
