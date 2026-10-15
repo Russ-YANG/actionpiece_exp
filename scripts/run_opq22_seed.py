@@ -1,4 +1,4 @@
-"""Run one independent OPQ2+OPQ2 seed per Slurm task."""
+"""Run one independent OPQ baseline seed per Slurm task."""
 import os
 import runpy
 import socket
@@ -49,7 +49,10 @@ print(
 )
 sys.argv = [
     "scripts/opq_baseline.py", "train", "--config",
-    f"experiments/opq_baseline_beauty_text2_image2_seed{seed}.json",
+    os.environ.get(
+        "OPQ_SEED_CONFIG_PATTERN",
+        "experiments/opq_baseline_beauty_text2_image2_seed{seed}.json",
+    ).format(seed=seed),
 ]
 runpy.run_path("scripts/opq_baseline.py", run_name="__main__")
 print(f"OPQ_SEED_SUCCESS seed={seed}", flush=True)

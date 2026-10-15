@@ -111,7 +111,7 @@ git rev-parse HEAD
 每次提交作业都固定完整 Git commit。例如四卡实验的提交方式：
 
 ```bash
-OPQ_FOUR_JOB=$(sbatch --parsable --export=ALL,OPQ_BASELINE_COMMIT="$(git rev-parse HEAD)" scripts/opq22_four_seeds.sbatch)
+OPQ_FOUR_JOB=$(sbatch --parsable --export=ALL,OPQ_BASELINE_COMMIT="$(git rev-parse HEAD)" scripts/opq22_patience50_four_seeds.sbatch)
 ```
 
 先检查对应 seed 的输出目录是否已有产物。入口拒绝覆盖旧输出；需要新实验时使用独立配置和目录。不要为已经完成的相同配置重复提交。
@@ -119,3 +119,41 @@ OPQ_FOUR_JOB=$(sbatch --parsable --export=ALL,OPQ_BASELINE_COMMIT="$(git rev-par
 四卡作业为四个独立单卡进程，训练 seed 为 2024–2027，OPQ 和消歧映射保持固定。每个进程在导入 PyTorch 前隔离 GPU。运行时仍需检查每个 seed 的 GPU_BIND、SEED_START、最终成功标志、Slurm 退出状态及 result.json；语法检查不等于服务器运行通过。
 
 不重复跑 smoke。新错误或影响关键路径的改动才触发针对性检查。
+
+## Early stopping protocol: patience 50
+
+自 2026-10-16 起，新一轮对比使用 patience=50，每个 epoch 验证一次，
+按验证集 NDCG@10 选模，最多 200 epochs。达到 200 epochs 时仍会停止，
+不保证在最大轮次后继续补足 50 轮。
+
+旧 patience=20 配置和结果保留，不覆盖。新配置名含 patience50，
+run_id 和输出目录也含 patience50。两个方法均准备训练 seed 2024–2027；
+OPQ SID 和 disambiguation_seed=2024 固定不变，batch、损失、模型、
+学习率、推理与集成设置保持原样。
+
+- 文本 OPQ4 配置：experiments/opq_baseline_beauty_text4_patience50_seed{seed}.json
+- 文本2＋图像2 配置：experiments/opq_baseline_beauty_text2_image2_patience50_seed{seed}.json
+
+复用经过实际训练验证的四进程单卡启动器。OPQ_SEED_CONFIG_PATTERN 只选择
+各 seed 的配置文件，不改变 GPU 隔离机制。新增两套 Slurm 脚本，每套申请
+四张 GPU、32 CPU、64GB 内存、24 小时。需要完整对比时，分别提交两套；
+这是八次独立训练，不是一次单卡训练。
+
+服务器同步并核对固定 commit、确认没有旧作业依赖工作区后，可由用户选择提交。
+
+文本 OPQ4：
+```bash
+OPQ_TEXT4_P50_JOB=$(sbatch --parsable --export=ALL,OPQ_BASELINE_COMMIT="$(git rev-parse HEAD)" scripts/opq_text4_patience50_four_seeds.sbatch)
+```
+
+文本2＋图像2：
+```bash
+OPQ_22_P50_JOB=$(sbatch --parsable --export=ALL,OPQ_BASELINE_COMMIT="$(git rev-parse HEAD)" scripts/opq22_patience50_four_seeds.sbatch)
+```
+
+任务日志分别为 logs/opq_baseline/opq4-p50-four-JOBID-taskRANK.out 和
+logs/opq_baseline/opq22-p50-four-JOBID-taskRANK.out，RANK=0–3 对应 seed=2024–2027。
+
+当前 checkpoint 只保存模型权重，没有优化器、学习率调度器和完整随机状态。
+patience=50 实验应从头训练，不能把旧 checkpoint 的继续训练当成等价恢复。
+配置准备或语法检查不代表新训练已经运行。

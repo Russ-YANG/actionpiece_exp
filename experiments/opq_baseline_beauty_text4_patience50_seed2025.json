@@ -1,0 +1,32 @@
+{
+  "base_commit": "31bc856cc5e166146db92551052545e1c866a59a",
+  "processed_dir": "cache/AmazonReviews2014/Beauty/processed",
+  "sid_path": "results/opq_only/beauty_local8b_d768_opq4_seed2024/item.sem_ids",
+  "output_dir": "results/opq_baseline/beauty_opq4_seed2025_patience50_full",
+  "rand_seed": 2025,
+  "disambiguation_seed": 2024,
+  "train_shuffle": "feature",
+  "n_inference_ensemble": 5,
+  "num_beams": 50,
+  "topk": [
+    5,
+    10
+  ],
+  "metrics": [
+    "recall",
+    "ndcg",
+    "err"
+  ],
+  "run_id": "beauty_opq4_no_merge_seed2025_patience50_full",
+  "num_proc": 1,
+  "epochs": 200,
+  "patience": 50,
+  "train_batch_size": 256,
+  "eval_batch_size": 128,
+  "lr": 0.003,
+  "weight_decay": 0.1,
+  "warmup_steps": 10000,
+  "eval_interval": 1,
+  "val_metric": "ndcg@10",
+  "max_item_seq_len": 20
+}
