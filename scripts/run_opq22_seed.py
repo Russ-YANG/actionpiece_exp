@@ -15,6 +15,22 @@ for key in list(os.environ):
         os.environ.pop(key, None)
 os.environ["ACCELERATE_USE_CPU"] = "false"
 
+# Select one GPU before PyTorch initializes CUDA.
+original_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+devices = [value.strip() for value in original_visible.split(",") if value.strip()]
+local_rank = int(os.environ["SLURM_LOCALID"])
+if len(devices) == 4 and len(set(devices)) == 4:
+    if not 0 <= local_rank < 4:
+        raise RuntimeError(f"Unexpected local rank: {local_rank}")
+    os.environ["CUDA_VISIBLE_DEVICES"] = devices[local_rank]
+elif len(devices) != 1:
+    raise RuntimeError(f"Unexpected GPU visibility: {original_visible!r}")
+print(
+    f"GPU_BIND task={rank} original={original_visible!r} "
+    f"selected={os.environ['CUDA_VISIBLE_DEVICES']}",
+    flush=True,
+)
+
 import torch
 
 if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
