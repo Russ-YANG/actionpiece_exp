@@ -21,3 +21,4 @@ __pycache__/
 *.pyc
 /results/opq_baseline/
 /results/opq_only/
+/results/opq_alignment/

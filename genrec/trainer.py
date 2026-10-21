@@ -144,6 +144,8 @@ class Trainer:
       epoch_started = time.perf_counter()
       self.model.train()
       total_loss = 0.0
+      alignment_totals = collections.defaultdict(float)
+      alignment_examples = 0
       train_progress_bar = tqdm(
           train_dataloader,
           total=len(train_dataloader),
@@ -159,6 +161,14 @@ class Trainer:
         optimizer.step()
         scheduler.step()
         total_loss = total_loss + loss.item()
+        if 'alignment_loss' in outputs:
+          count = outputs['alignment_count']
+          alignment_examples += count
+          for key in ('alignment_rec_loss', 'alignment_loss',
+                      'alignment_cosine', 'alignment_weighted_loss',
+                      'alignment_negative_cosine', 'alignment_cosine_gap',
+                      'alignment_top1'):
+            alignment_totals[key] += outputs[key].item() * count
 
       self.accelerator.log(
           {'Loss/train_loss': total_loss / len(train_dataloader)},
@@ -168,6 +178,16 @@ class Trainer:
           f'[Epoch {epoch + 1}] Train Loss:'
           f' {total_loss / len(train_dataloader)}'
       )
+      if alignment_examples:
+        alignment_metrics = {
+            key: value / alignment_examples
+            for key, value in alignment_totals.items()
+        }
+        self.accelerator.log(
+            {f'Loss/{key}': value for key, value in alignment_metrics.items()},
+            step=epoch + 1,
+        )
+        self.log(f'[Epoch {epoch + 1}] Alignment: {alignment_metrics}')
       if self.config.get('profile_history', False):
         device = self.accelerator.device
         if device.type == 'cuda':

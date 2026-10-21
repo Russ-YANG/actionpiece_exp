@@ -93,12 +93,14 @@ def load_inputs(config):
     return mapping, sequences, features
 
 
-def main():
+def main(require_alignment=False):
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("check", "smoke", "train"))
     parser.add_argument("--config", required=True)
     args = parser.parse_args()
     raw_config = json.loads(Path(args.config).read_text())
+    if require_alignment and "alignment_weight" not in raw_config:
+        raise ValueError("Alignment entry requires an explicit alignment_weight, including 0")
     commit = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
@@ -118,10 +120,20 @@ def main():
         changed = subprocess.check_output(
             ["git", "diff", "HEAD", "--name-only"], cwd=ROOT, text=True
         ).strip()
-        if tracked.returncode or changed:
+        # `git diff HEAD` ignores untracked files; imported code lives here.
+        untracked = subprocess.check_output(
+            ["git", "ls-files", "--others", "--exclude-standard", "--",
+             "genrec", "scripts"], cwd=ROOT, text=True,
+        ).strip()
+        if tracked.returncode or changed or untracked:
             raise RuntimeError("Commit and review baseline code before full training")
 
     mapping, sequences, features = load_inputs(raw_config)
+    alignment = None
+    alignment_text = None
+    if "alignment_weight" in raw_config:
+        from genrec.opq_alignment import load_alignment_inputs
+        alignment_text, alignment = load_alignment_inputs(raw_config, mapping)
     codec = AtomicCodec(features, raw_config["rand_seed"])
     for row in features.values():
         tokens = [codec.rank[(slot, value)] for slot, value in enumerate(row)]
@@ -136,8 +148,12 @@ def main():
             "users": len(sequences),
             "target_features": 5,
             "merge": False,
+            "alignment": alignment,
             "disambiguation_seed": raw_config["disambiguation_seed"],
-            "loss": "full_vocabulary_cross_entropy",
+            "loss": (
+                "full_vocabulary_cross_entropy_plus_weighted_negative_cosine"
+                if alignment is not None else "full_vocabulary_cross_entropy"
+            ),
             "base_commit": raw_config["base_commit"], "git_commit": commit,
             "status": "DATA_CHECK_SUCCESS",
         }, indent=2))
@@ -185,6 +201,12 @@ def main():
         def forward(self, batch):
             return self.t5(**batch)
 
+    if alignment is not None:
+        from genrec.opq_alignment import add_alignment
+        OPQModel, OPQTokenizer = add_alignment(
+            OPQModel, OPQTokenizer, raw_config, mapping, features, alignment_text
+        )
+
     # Process-local registration; repository modules are not edited.
     dataset_registry.AmazonReviews2014 = CachedDataset
     model_registry.ActionPiece = OPQModel
@@ -224,6 +246,14 @@ def main():
     (output / "manifest.json").write_text(json.dumps({
         "base_commit": raw_config["base_commit"], "git_commit": commit,
         "entry_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "code_sha256": {
+            name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+            for name in (
+                "scripts/opq_baseline.py", "scripts/opq_alignment.py",
+                "genrec/opq_alignment.py", "genrec/trainer.py",
+            )
+            if (ROOT / name).is_file()
+        },
         "git_status": subprocess.check_output(
             ["git", "status", "--short"], cwd=ROOT, text=True
         ),
@@ -241,7 +271,11 @@ def main():
             "cuda": torch.version.cuda,
             "gpu": torch.cuda.get_device_name(0),
         },
-        "training_loss": "full_vocabulary_cross_entropy",
+        "training_loss": (
+            "full_vocabulary_cross_entropy_plus_weighted_negative_cosine"
+            if alignment is not None else "full_vocabulary_cross_entropy"
+        ),
+        "alignment": alignment,
         "decoding": "slot_constrained_beam_with_EOS_and_catalog_validation",
         "ensemble": "existing_fork_rank_weighted_fusion",
         "token_mapping": "OPQ token = 1 + codebook_id * 256 + code_value",

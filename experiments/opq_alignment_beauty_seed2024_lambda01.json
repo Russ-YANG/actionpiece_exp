@@ -1,0 +1,36 @@
+{
+  "base_commit": "31bc856cc5e166146db92551052545e1c866a59a",
+  "processed_dir": "cache/AmazonReviews2014/Beauty/processed",
+  "sid_path": "results/opq_only/beauty_local8b_d768_opq4_seed2024/item.sem_ids",
+  "output_dir": "results/opq_alignment/beauty_text4_seed2024_lambda01",
+  "rand_seed": 2024,
+  "disambiguation_seed": 2024,
+  "train_shuffle": "feature",
+  "n_inference_ensemble": 5,
+  "num_beams": 50,
+  "topk": [
+    5,
+    10
+  ],
+  "metrics": [
+    "recall",
+    "ndcg",
+    "err"
+  ],
+  "run_id": "beauty_opq4_alignment_seed2024_lambda01",
+  "num_proc": 1,
+  "epochs": 200,
+  "patience": 50,
+  "train_batch_size": 256,
+  "eval_batch_size": 128,
+  "lr": 0.003,
+  "weight_decay": 0.1,
+  "warmup_steps": 10000,
+  "eval_interval": 1,
+  "val_metric": "ndcg@10",
+  "max_item_seq_len": 20,
+  "alignment_weight": 0.1,
+  "alignment_init_seed": 91021,
+  "alignment_embedding_path": "cache/AmazonReviews2014/Beauty/processed/qwen_local.Qwen3-VL-Embedding-8B.d768.i711daf44f948.r2c4565515e0f.c393e2978d278.m2048.tbfloat16.asdpa.sent_emb",
+  "alignment_embedding_manifest_path": "cache/AmazonReviews2014/Beauty/processed/qwen_local.Qwen3-VL-Embedding-8B.d768.i711daf44f948.r2c4565515e0f.c393e2978d278.m2048.tbfloat16.asdpa.sent_emb.manifest.json"
+}
