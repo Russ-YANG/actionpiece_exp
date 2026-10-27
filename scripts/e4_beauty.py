@@ -64,6 +64,8 @@ def main():
             self.category = "Beauty"
             self.id_mapping = mapping
             self.all_item_seqs = sequences
+            # Cached embeddings supply content; E4 has no attr_id features.
+            self.item2meta = {}
 
     class CachedEmbeddingsTokenizer(ActionPieceTokenizer):
         def _encode_sent_emb(self, *unused, **kwargs):
