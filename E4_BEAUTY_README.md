@@ -87,7 +87,7 @@ no paper score is asserted here.
 ## Four-seed parallel variant (selected)
 
 Use `scripts/e4_beauty_four_seeds.sbatch` instead of the single-seed template.
-One node, four GPUs, 32 CPUs total (8/task), 128 GiB total, maximum 24 hours.
+One node, four GPUs, 32 CPUs total (8/task), 128 GiB total, maximum 48 hours.
 Seeds 2024--2027 each run a separate ActionPiece pipeline and isolated cache.
 This changes the pipeline seed (hash/merge/training RNG), not just model
 initialization. Faiss clustering keeps the historical implementation defaults;
@@ -112,3 +112,5 @@ must print E4_FOUR_SEEDS_SUCCESS and exit 0:0. Results are under
 `results/e4_beauty/job_JOBID/seedSEED/`. A failing task does not kill its siblings.
 Local syntax and eight mocked GPU/seed-isolation cases passed. No real CUDA,
 Faiss, merge, or full training execution has been validated for this new entry.
+
+Four-seed rerun: time limit raised to 48 hours; 200 epochs maximum and patience 50 retained. Starts from scratch; previous outputs retained. Epoch-61 slowdown from job 5392122 remains unexplained. Checkpoints still contain model weights only, without full training-state resume.

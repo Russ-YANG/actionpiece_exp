@@ -8,7 +8,7 @@
 #SBATCH --gres=gpu:4
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --output=logs/e4_beauty/four-%j.out
 #SBATCH --error=logs/e4_beauty/four-%j.out
 set -euo pipefail
