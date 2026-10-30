@@ -114,3 +114,17 @@ Local syntax and eight mocked GPU/seed-isolation cases passed. No real CUDA,
 Faiss, merge, or full training execution has been validated for this new entry.
 
 Four-seed rerun: time limit raised to 48 hours; 200 epochs maximum and patience 50 retained. Starts from scratch; previous outputs retained. Epoch-61 slowdown from job 5392122 remains unexplained. Checkpoints still contain model weights only, without full training-state resume.
+
+## E4 OPQ2+OPQ2 with merges
+
+Use `scripts/e4_beauty_opq22_four_seeds.sbatch`; four seeds 2024--2027,
+4 GPUs, 32 requested CPUs, 128 GiB, 48 hours, 200 epochs maximum and patience 50.
+Uses the existing `e4_qwen3_vl_8b_separate_opq2x256_beauty_train.yaml`.
+All other model/merge settings retain that historical configuration.
+The shared entry defaults to 4+4; this launcher explicitly selects 2+2.
+Outputs: `results/e4_beauty_opq22/job_JOBID/seedSEED/`;
+logs: `logs/e4_beauty_opq22/four-JOBID-taskRANK.out`.
+Each seed independently fits OPQ and learns merges in its isolated cache.
+Existing global OPQ2 caches are not copied into these runs.
+This is an ActionPiece E4 experiment, not the no-merge OPQ baseline.
+No alignment loss. Full training-state resume is still unsupported.

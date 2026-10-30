@@ -16,9 +16,14 @@ if len(devices) == 4 and len(set(devices)) == 4:
     os.environ["CUDA_VISIBLE_DEVICES"] = devices[local_rank]
 elif len(devices) != 1:
     raise RuntimeError("Unexpected GPU visibility: " + repr(devices))
+codebooks = int(os.environ.get("E4_CODEBOOKS", "4"))
+if codebooks not in (2, 4):
+    raise ValueError("E4_CODEBOOKS must be 2 or 4")
+output_root = "results/e4_beauty_opq22" if codebooks == 2 else "results/e4_beauty"
 seed = 2024 + rank
 print(f"E4_START seed={seed} task={rank} GPU={os.environ['CUDA_VISIBLE_DEVICES']}", flush=True)
 sys.argv = ["scripts/e4_beauty.py", "train", "--seed", str(seed),
-            "--output", f"results/e4_beauty/job_{os.environ['SLURM_JOB_ID']}/seed{seed}"]
+            "--codebooks-per-modality", str(codebooks),
+            "--output", f"{output_root}/job_{os.environ['SLURM_JOB_ID']}/seed{seed}"]
 runpy.run_path("scripts/e4_beauty.py", run_name="__main__")
 print(f"E4_SEED_SUCCESS seed={seed}", flush=True)

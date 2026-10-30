@@ -15,6 +15,7 @@ def main():
     parser.add_argument("mode", choices=("check", "train"))
     parser.add_argument("--output", required=True)
     parser.add_argument("--seed", type=int, default=2024)
+    parser.add_argument("--codebooks-per-modality", type=int, choices=(2, 4), default=4)
     args = parser.parse_args()
     processed = ROOT / "cache/AmazonReviews2014/Beauty/processed"
     mapping = json.loads((processed / "id_mapping.json").read_text())
@@ -41,7 +42,7 @@ def main():
         raise FileExistsError(output)
     print(json.dumps({"items": len(items), "users": len(sequences),
                       "embeddings": list(map(str, embeddings)),
-                      "merge": True, "semantic_slots": 8, "seed": args.seed}, indent=2))
+                      "merge": True, "semantic_slots": 2 * args.codebooks_per_modality, "seed": args.seed}, indent=2))
     if args.mode == "check":
         print("E4_DATA_CHECK_SUCCESS")
         return
@@ -83,15 +84,18 @@ def main():
         (destination / sidecar.name).symlink_to(sidecar)
     registry.AmazonReviews2014 = CachedBeauty
     config = {"rand_seed": args.seed, "patience": 50,
-              "run_id": f"beauty_e4_4plus4_seed{args.seed}",
+              "run_id": f"beauty_e4_{args.codebooks_per_modality}plus{args.codebooks_per_modality}_seed{args.seed}",
               "cache_dir": str(output / "cache"),
               "log_dir": str(output / "logs"),
               "ckpt_dir": str(output / "checkpoints"),
               "tensorboard_log_dir": str(output / "tensorboard"),
               "result_path": str(output / "result.json")}
+    config_name = ("e4_qwen3_vl_8b_separate_opq2x256_beauty_train.yaml"
+                   if args.codebooks_per_modality == 2 else
+                   "e4_qwen3_vl_8b_separate_opq_beauty_train.yaml")
     pipeline = Pipeline("ActionPiece", "AmazonReviews2014",
                         tokenizer=CachedEmbeddingsTokenizer,
-                        config_file=str(ROOT / "experiments/e4_qwen3_vl_8b_separate_opq_beauty_train.yaml"),
+                        config_file=str(ROOT / "experiments" / config_name),
                         config_dict=config)
     (output / "manifest.json").write_text(json.dumps({
         "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip(),
