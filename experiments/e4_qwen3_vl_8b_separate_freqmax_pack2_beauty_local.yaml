@@ -1,0 +1,5 @@
+# Compatibility override for the local ActionPiece checkout.
+# The supplied frozen features and tokenizer use this exact cache-safe stem.
+qwen_separate_artifact_stem: qwen_separate.Qwen3-VL-Embedding-8B.t768.th235523e6f242.i768.ihce07c0028c77.topq2x65536.iopq2x65536.seed2024.h128
+n_hash_buckets: 128
+actionpiece_vocab_size: 40000

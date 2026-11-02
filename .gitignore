@@ -11,3 +11,5 @@ merge_logs/
 .DS_Store
 __pycache__/
 *.pyc
+.venv/
+*.bak-*

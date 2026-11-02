@@ -110,8 +110,11 @@ def get_file_name(config: dict[str, Any], suffix: str = '') -> str:
       str(value) for key, value in config.items() if key != 'accelerator'
   )
   md5 = hashlib.md5(config_str.encode()).hexdigest()[:6]
-  command_line_args = get_command_line_args_str()
-  logfilename = f'{config["run_id"]}-{command_line_args}-{config["run_local_time"]}-{md5}-{suffix}'
+  # Keep log paths below filesystem limits even when many CLI overrides are used.
+  # The full configuration is still captured by the run metadata/TensorBoard.
+  logfilename = (
+      f'{config["run_id"]}-{config["run_local_time"]}-{md5}{suffix}'
+  )
   return logfilename
 
 

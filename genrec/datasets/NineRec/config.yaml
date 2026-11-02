@@ -1,0 +1,5 @@
+category: QB
+data_root: /home/lzr/science/datasets/ninerec/prepared_rpg
+text_column: text_zh
+metadata: sentence
+split: leave_one_out

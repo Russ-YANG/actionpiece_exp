@@ -16,6 +16,7 @@
 """ActionPiece tokenizer for GenRec."""
 
 import collections
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 import json
@@ -119,20 +120,43 @@ class ActionPieceTokenizer(AbstractTokenizer):
     return stem
 
   def _semantic_artifact_stem(self) -> str:
+    # Keep tokenizer artifacts fixed when measuring recommendation-training
+    # seed variance. Older configs use rand_seed for both roles.
+    tokenizer_seed = self.config.get('tokenizer_seed')
+    if tokenizer_seed is None:
+      tokenizer_seed = self.config['rand_seed']
+    if self.config['metadata'] == 'qwen_fused':
+      return (
+          f'{self.config["qwen_fused_artifact_stem"]}.'
+          f'opq{self.config["pq_n_codebooks"]}x'
+          f'{self.config["pq_codebook_size"]}.'
+          f'seed{tokenizer_seed}'
+      )
     if self.config['sent_emb_backend'] not in {'qwen_api', 'qwen_local'}:
       return self._sent_artifact_stem()
+    artifact_stem = self._sent_artifact_stem()
+    artifact_variant = self.config.get('qwen_artifact_variant')
+    if artifact_variant:
+      artifact_stem = f'{artifact_stem}.{artifact_variant}'
     return (
-        f'{self._sent_artifact_stem()}.'
+        f'{artifact_stem}.'
         f'opq{self.config["pq_n_codebooks"]}x'
         f'{self.config["pq_codebook_size"]}.'
-        f'seed{self.config["rand_seed"]}'
+        f'seed{tokenizer_seed}'
     )
 
   def _feature_artifact_stem(self) -> str:
-    if self.config['metadata'] != 'qwen_text':
+    if self.config['metadata'] == 'qwen_separate':
+      return self.config['qwen_separate_artifact_stem']
+    if self.config['metadata'] == 'qwen_fused':
+      return (
+          f'qwen_fused.{self._semantic_artifact_stem()}.'
+          f'h{self.config["n_hash_buckets"]}'
+      )
+    if self.config['metadata'] not in {'qwen_text', 'qwen_multimodal'}:
       return self.config['metadata']
     return (
-        f'qwen_text.{self._semantic_artifact_stem()}.'
+        f'{self.config["metadata"]}.{self._semantic_artifact_stem()}.'
         f'h{self.config["n_hash_buckets"]}'
     )
 
@@ -225,6 +249,30 @@ class ActionPieceTokenizer(AbstractTokenizer):
           show_progress_bar=True,
           device=self.config['device'],
       )
+    elif self.config['sent_emb_backend'] == 'clip':
+      clip_model = CLIPModel.from_pretrained(
+          self.config['sent_emb_model']
+      ).to(self.config['device'])
+      clip_processor = CLIPProcessor.from_pretrained(
+          self.config['sent_emb_model']
+      )
+      clip_model.eval()
+      batch_size = self.config['sent_emb_batch_size']
+      chunks = []
+      for start in tqdm.tqdm(
+          range(0, len(meta_sentences), batch_size),
+          desc='[TOKENIZER] CLIP text embeddings',
+      ):
+        batch_texts = meta_sentences[start:start + batch_size]
+        inputs = clip_processor(
+            text=batch_texts, return_tensors='pt', padding=True, truncation=True
+        )
+        inputs = {k: v.to(self.config['device']) for k, v in inputs.items()}
+        with torch.no_grad():
+          batch_embs = clip_model.get_text_features(**inputs)
+          batch_embs = torch.nn.functional.normalize(batch_embs, dim=-1)
+        chunks.append(batch_embs.detach().cpu().numpy().astype(np.float32))
+      sent_embs = np.concatenate(chunks, axis=0)
     else:
       raise ValueError(
           f'Unknown sent_emb_backend: {self.config["sent_emb_backend"]}'
@@ -365,17 +413,49 @@ class ActionPieceTokenizer(AbstractTokenizer):
       pending_indices.clear()
 
     self.logger.info('[TOKENIZER] Encoding image embeddings...')
-    for i in tqdm.tqdm(range(1, dataset.n_items)):
-      item = dataset.id_mapping['id2item'][i]
-      image = self._download_image(
-          item, self._get_image_url(dataset, item), failure_log_path
-      )
-      if image is None:
-        continue
-      pending_images.append(image)
-      pending_indices.append(i - 1)
-      if len(pending_images) >= self.config['image_emb_batch_size']:
-        flush_batch()
+
+    def _fetch(idx_item):
+      idx, item = idx_item
+      url = self._get_image_url(dataset, item)
+      if not url:
+        return idx, None, 'missing_url'
+      try:
+        response = requests.get(
+            url, timeout=self.config['image_download_timeout']
+        )
+        response.raise_for_status()
+        return (
+            idx,
+            Image.open(io.BytesIO(response.content)).convert('RGB'),
+            None,
+        )
+      except Exception as exc:  # pylint: disable=broad-exception-caught
+        return idx, None, repr(exc)
+
+    indexed_items = [
+        (i - 1, dataset.id_mapping['id2item'][i])
+        for i in range(1, dataset.n_items)
+    ]
+    n_workers = self.config.get('image_download_workers', 32)
+    self.logger.info(
+        f'[TOKENIZER] Downloading images with {n_workers} workers...'
+    )
+    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+      for idx, image, err in tqdm.tqdm(
+          pool.map(_fetch, indexed_items),
+          total=len(indexed_items),
+          desc='[TOKENIZER] Downloading images',
+      ):
+        if image is None:
+          item = dataset.id_mapping['id2item'][idx + 1]
+          self._log_image_failure(
+              failure_log_path, item, self._get_image_url(dataset, item), err
+          )
+          continue
+        pending_images.append(image)
+        pending_indices.append(idx)
+        if len(pending_images) >= self.config['image_emb_batch_size']:
+          flush_batch()
     flush_batch()
 
     image_embs.tofile(output_path)
@@ -516,11 +596,29 @@ class ActionPieceTokenizer(AbstractTokenizer):
         codebook_size=self.config['image_pq_codebook_size'],
     )
 
+  def _image_semantic_artifact_stem(self) -> str:
+    """Cache name for image semantic IDs.
+
+    The quantiser settings must be part of the name; otherwise arms that differ
+    only in the number of image codebooks (2+2 vs 3+3 vs 4+4) would read and
+    overwrite each other's cache.
+    """
+    model_name = os.path.basename(self.config['image_emb_model'])
+    safe_model_name = re.sub(r'[^A-Za-z0-9._-]+', '-', model_name)
+    tokenizer_seed = self.config.get('tokenizer_seed')
+    if tokenizer_seed is None:
+      tokenizer_seed = self.config['rand_seed']
+    return (
+        f'{safe_model_name}.d{self.config["image_emb_dim"]}.'
+        f'opq{self.config["image_pq_n_codebooks"]}x'
+        f'{self.config["image_pq_codebook_size"]}.seed{tokenizer_seed}'
+    )
+
   def _get_image_sem_ids(self, dataset: AbstractDataset) -> dict[Any, Any]:
     image_sem_ids_path = os.path.join(
         dataset.cache_dir,
         'processed',
-        f'{os.path.basename(self.config["image_emb_model"])}.image_sem_ids',
+        f'{self._image_semantic_artifact_stem()}.image_sem_ids',
     )
     if not os.path.exists(image_sem_ids_path):
       self.logger.info(
@@ -571,6 +669,8 @@ class ActionPieceTokenizer(AbstractTokenizer):
       fused_embs = np.concatenate(
           [sent_embs, image_weight * image_embs], axis=-1
       ).astype(np.float32)
+      if self.config.get('fused_final_normalize', False):
+        fused_embs = self._normalize_embs(fused_embs)
       self.logger.info(
           f'[TOKENIZER] Fused embeddings shape: {fused_embs.shape}'
       )
@@ -681,7 +781,7 @@ class ActionPieceTokenizer(AbstractTokenizer):
       item2sem_ids = self._get_fused_sem_ids(dataset)
     else:
       item2sem_ids = self._get_sem_ids(dataset)
-    if self.config['metadata'] == 'sentence_image':
+    if self.config['metadata'] in ('sentence_image', 'qwen_separate'):
       item2image_sem_ids = self._get_image_sem_ids(dataset)
       item2sem_ids = {
           item: tuple(item2sem_ids[item]) + tuple(item2image_sem_ids[item])
@@ -793,7 +893,9 @@ class ActionPieceTokenizer(AbstractTokenizer):
       tokenizer_filename = 'actionpiece.sentence_image.json'
     elif self.config['metadata'] == 'sentence_image_fused':
       tokenizer_filename = 'actionpiece.sentence_image_fused.json'
-    elif self.config['metadata'] == 'qwen_text':
+    elif self.config['metadata'] in {
+        'qwen_text', 'qwen_multimodal', 'qwen_fused', 'qwen_separate'
+    }:
       tokenizer_filename = (
           f'actionpiece.{self._feature_artifact_stem()}.'
           f'v{self.config["actionpiece_vocab_size"]}.json'
@@ -815,10 +917,10 @@ class ActionPieceTokenizer(AbstractTokenizer):
         merge_log_path = self.config['actionpiece_merge_log_path']
         if merge_log_path is None:
           merge_log_filename = 'actionpiece.merge_log.jsonl'
-          if self.config['metadata'] == 'qwen_text':
+          if self.config['metadata'] in {'qwen_text', 'qwen_multimodal'}:
             merge_log_filename = (
-                f'actionpiece.{self._feature_artifact_stem()}.'
-                f'v{self.config["actionpiece_vocab_size"]}.merge_log.jsonl'
+              f'actionpiece.{self._feature_artifact_stem()}.'
+              f'v{self.config["actionpiece_vocab_size"]}.merge_log.jsonl'
             )
           merge_log_path = os.path.join(
               dataset.cache_dir, 'processed', merge_log_filename

@@ -175,6 +175,32 @@ class Pipeline:
       )
     test_dataloader = get_dataloader('test', test_batch_size, False)
 
+    test_checkpoint = self.config.get('test_checkpoint')
+    if test_checkpoint:
+      checkpoint_path = os.path.expanduser(test_checkpoint)
+      if not os.path.isabs(checkpoint_path):
+        checkpoint_path = os.path.join(os.getcwd(), checkpoint_path)
+      if not os.path.isfile(checkpoint_path):
+        raise FileNotFoundError(
+            f'Test checkpoint not found: {checkpoint_path}'
+        )
+
+      self.log(f'Loading checkpoint for test-only evaluation: {checkpoint_path}')
+      self.model.load_state_dict(torch.load(checkpoint_path, map_location='cpu'))
+      self.model, test_dataloader = self.accelerator.prepare(
+          self.model, test_dataloader
+      )
+      self.trainer.model = self.model
+      test_results = self.trainer.evaluate(test_dataloader)
+      if self.accelerator.is_main_process:
+        for key in test_results:
+          self.trainer.accelerator.log(
+              {f'Test_Metric/{key}': test_results[key]}
+          )
+      self.log(f'Test Results: {test_results}')
+      self.trainer.end()
+      return
+
     self.trainer.fit(train_dataloader, val_dataloader)
 
     self.accelerator.wait_for_everyone()

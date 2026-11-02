@@ -97,6 +97,15 @@ class Trainer:
         train_dataloader: The dataloader for training data.
         val_dataloader: The dataloader for validation data.
     """
+    init_checkpoint = self.config.get('init_checkpoint')
+    if init_checkpoint:
+      checkpoint_path = os.path.expanduser(init_checkpoint)
+      if not os.path.isabs(checkpoint_path):
+        checkpoint_path = os.path.join(os.getcwd(), checkpoint_path)
+      self.log(f'Loading initial model weights from {checkpoint_path}')
+      state_dict = torch.load(checkpoint_path, map_location='cpu')
+      self.model.load_state_dict(state_dict)
+
     optimizer = AdamW(
         self.model.parameters(),
         lr=self.config['lr'],
@@ -129,10 +138,12 @@ class Trainer:
     n_epochs = np.ceil(
         total_n_steps / (len(train_dataloader) * self.accelerator.num_processes)
     ).astype(int)
-    best_epoch = 0
-    best_val_score = -1
+    resume_epoch = int(self.config.get('resume_epoch', 0))
+    best_epoch = int(self.config.get('initial_best_epoch', 0))
+    best_val_score = float(self.config.get('initial_best_val_score', -1))
 
-    for epoch in range(n_epochs):
+    for local_epoch in range(n_epochs):
+      epoch = local_epoch + resume_epoch
       # Training
       self.model.train()
       total_loss = 0.0
