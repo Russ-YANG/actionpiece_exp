@@ -173,3 +173,90 @@ configs/rqvae_inference_flat.yaml   上游缺失的那份 inference 配置
 run_rqvae.sh / run_sid.sh / run_tiger.sh    上面四步的包装脚本
 grid_local_changes.patch        GRID 本地改动（忽略空白后仅 642 行，主要是 config 注释汉化）
 ```
+
+---
+
+# 附：跑完 d128 之后又踩到的三个坑（2026-11-12）
+
+前 5 个坑是训练阶段的。真正把 d128 跑出指标，还要再绕过下面三个。
+
+## 坑 6：`ckpt_path` 的值里不能有 `=`
+
+GRID 的 checkpoint 名字是 `checkpoint_epoch=000_step=003200.ckpt`，而 Hydra 用 `=` 分隔键值，所以直接传会报：
+
+```
+mismatched input '=' expecting <EOF>
+```
+
+**做法**：建一个不带 `=` 的软链接再用。
+
+```bash
+ln -sf "$(realpath logs/train/runs/<date>/<time>/checkpoints/checkpoint_epoch=000_step=003200.ckpt)" \
+       rqvae_d128.ckpt
+# 然后把 ckpt_path=rqvae_d128.ckpt 传进去
+```
+
+## 坑 7：推理的 dataloader 键名是 `predict_dataloader_config`
+
+`tiger_inference_flat` 用的是 `data_loading.predict_dataloader_config.dataloader`，**没有** `test_dataloader_config`。写错会报 `Key 'test_dataloader_config' is not in struct`。
+
+而且它**同样有 num_workers 的坑**，不设 1 会看到更原始的报错：
+
+```
+File "src/data/loading/components/iterators.py", line 134, in initialize_feature_description
+    sample_record: tf.Tensor = next(iter(raw_dataset))
+StopIteration
+  → RuntimeError: generator raised StopIteration
+```
+
+原因同坑 1：**某些 worker 分到的文件列表是空的**。所以推理也要加：
+
+```bash
+data_loading.predict_dataloader_config.dataloader.num_workers=1
+```
+
+## 坑 8：`tiger_inference_flat` 只产预测，不算指标
+
+它只写出 `logs/inference/runs/<date>/<time>/pickle/merged_predictions_tensor.pt`（22,363 行），**不打指标**。指标是训练流程末尾的 `test` 步骤算的。
+
+**要拿 test 指标，就用 `src.train` 只跑 test**：
+
+```bash
+python -m src.train experiment=tiger_train_flat \
+  data_dir=data/amazon_data/beauty \
+  semantic_id_path=<3b 的 SID> \
+  ckpt_path=rqvae_d128.ckpt        # 换成 TIGER 的 best checkpoint
+  num_hierarchies=4 \
+  train=false test=true \
+  trainer.devices=1 \
+  data_loading.{train,val,test}_dataloader_config.dataloader.num_workers=1 \
+  ++model.should_check_prefix=false extras.print_config=false ++should_skip_retry=True
+```
+
+输出长这样（d128 实测）：
+
+```
+│         test/loss         │     9.466227531433105     │
+│       test/ndcg@10        │    0.03265681490302086    │
+│        test/ndcg@5        │   0.026666194200515747    │
+│      test/recall@10       │    0.05840003490447998    │
+│       test/recall@5       │    0.03979787975549698    │
+```
+
+## 坑 9：`max_steps=320000` 会白跑 20 小时
+
+d128 实测：`val/recall@5` 在 **step 3,200** 就到顶（0.0558），之后 3 小时没再提升，但早停因为指标抖动一直没触发（`patience=10 × val_check_interval=1600`），于是一直跑到我手动切掉的 65,437 步。
+
+**建议直接 `trainer.max_steps=30000`** —— best 出现在 3,200 附近，30,000 步足够，还能把单次训练压到 ~2.3 小时。
+
+# 附：d128 的 TIGER 结果（Beauty, Qwen 128 维, RQ-VAE 3×256）
+
+| 指标 | TIGER | RPG（同 encoder 同宽度） |
+|---|---|---|
+| test N@10 | **0.0327** | 0.0449 |
+| test N@5 | 0.0267 | 0.0373 |
+| test R@10 | **0.0584** | 0.0767 |
+| test R@5 | 0.0398 | 0.0525 |
+
+TIGER 明显弱于 RPG，符合预期：RQ-VAE 的 SID 比 OPQ 粗，且 TIGER 是更早的 baseline。
+取点方式与其他行一致：按 val 指标选 checkpoint（best 在 step 3,200），test 只评一次。
