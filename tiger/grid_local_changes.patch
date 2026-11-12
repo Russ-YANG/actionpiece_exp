@@ -1,0 +1,3657 @@
+diff --git a/configs/__init__.py b/configs/__init__.py
+index 56bf7f4..5e3fb87 100755
+--- a/configs/__init__.py
++++ b/configs/__init__.py
+@@ -1 +1 @@
+-# this file is needed here to include configs when building project as a package
++# 将项目作为包构建时，需要保留此文件以包含 configs 配置包。
+diff --git a/configs/callbacks/default.yaml b/configs/callbacks/default.yaml
+index 1b7ef08..006f144 100755
+--- a/configs/callbacks/default.yaml
++++ b/configs/callbacks/default.yaml
+@@ -2,7 +2,7 @@ defaults:
+   - model_checkpoint
+   - early_stopping
+   - model_summary
+-  # - rich_progress_bar # does not work well with unbonunded datasets.
++  # - rich_progress_bar # 对无边界数据集支持不佳。
+   - _self_
+ 
+ model_checkpoint:
+diff --git a/configs/callbacks/early_stopping.yaml b/configs/callbacks/early_stopping.yaml
+index b58ddba..5b209ee 100755
+--- a/configs/callbacks/early_stopping.yaml
++++ b/configs/callbacks/early_stopping.yaml
+@@ -1,16 +1,16 @@
+-## EarlyStopping is used to stop the training if the monitored quantity does not improve.
+-## implements callback from https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.EarlyStopping.html
++## EarlyStopping 用于在监控指标不再提升时停止训练。
++## 实现自 https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.EarlyStopping.html
+ 
+ early_stopping:
+   _target_: lightning.pytorch.callbacks.EarlyStopping
+-  monitor: ??? # quantity to be monitored, must be specified !!!
+-  min_delta: 0. # minimum change in the monitored quantity to qualify as an improvement
+-  patience: 3 # number of checks with no improvement after which training will be stopped
+-  verbose: False # verbosity mode
+-  mode: "min" # "max" means higher metric value is better, can be also "min"
+-  strict: True # whether to crash the training if monitor is not found in the validation metrics
+-  check_finite: True # when set True, stops training when the monitor becomes NaN or infinite
+-  stopping_threshold: null # stop training immediately once the monitored quantity reaches this threshold
+-  divergence_threshold: null # stop training as soon as the monitored quantity becomes worse than this threshold
+-  check_on_train_epoch_end: null # whether to run early stopping at the end of the training epoch
+-  # log_rank_zero_only: False  # this keyword argument isn't available in stable version
++  monitor: ??? # 要监控的指标，必须指定。
++  min_delta: 0. # 被视为提升所需的最小变化量。
++  patience: 3 # 连续多少次检查没有提升后停止训练。
++  verbose: False # 是否输出详细日志。
++  mode: "min" # "max" 表示指标越高越好，也可以设为 "min"。
++  strict: True # 如果在验证指标中找不到 monitor，是否直接中断训练。
++  check_finite: True # 为 True 时，monitor 变为 NaN 或无穷大就停止训练。
++  stopping_threshold: null # monitor 达到该阈值后立即停止训练。
++  divergence_threshold: null # monitor 劣化到该阈值后立即停止训练。
++  check_on_train_epoch_end: null # 是否在训练 epoch 结束时执行 early stopping。
++  # log_rank_zero_only: False  # stable 版本中暂不支持这个关键字参数。
+diff --git a/configs/callbacks/local_pickle_writer.yaml b/configs/callbacks/local_pickle_writer.yaml
+index a55f704..198832a 100644
+--- a/configs/callbacks/local_pickle_writer.yaml
++++ b/configs/callbacks/local_pickle_writer.yaml
+@@ -1,4 +1,4 @@
+-## Inference callback to write predictions local pickle files
++## 将预测结果写入本地 pickle 文件的推理 callback。
+ pickle_writer:
+   _target_: src.utils.inference_utils.LocalPickleWriter
+   output_dir: ${paths.output_dir}/pickle
+diff --git a/configs/callbacks/model_checkpoint.yaml b/configs/callbacks/model_checkpoint.yaml
+index 3cfb4a6..7b951d9 100755
+--- a/configs/callbacks/model_checkpoint.yaml
++++ b/configs/callbacks/model_checkpoint.yaml
+@@ -1,18 +1,18 @@
+-## Callback to save the model with the best score.
+-## Implements callback from https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html
++## 用于保存最佳分数模型的 callback。
++## 实现自 https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html
+ 
+ model_checkpoint:
+   _target_: lightning.pytorch.callbacks.ModelCheckpoint
+-  dirpath: null # directory to save the model file
+-  filename: null # checkpoint filename
+-  monitor: null # name of the logged metric which determines when model is improving
+-  verbose: True # verbosity mode
+-  save_last: null # additionally always save an exact copy of the last checkpoint to a file last.ckpt
+-  save_top_k: 1 # save k best models (determined by above metric)
+-  mode: "min" # "max" means higher metric value is better, can be also "min"
+-  auto_insert_metric_name: True # when True, the checkpoints filenames will contain the metric name
+-  save_weights_only: False # if True, then only the model’s weights will be saved
+-  every_n_train_steps: null # number of training steps between checkpoints
+-  train_time_interval: null # checkpoints are monitored at the specified time interval
+-  every_n_epochs: null # number of epochs between checkpoints
+-  save_on_train_epoch_end: null # whether to run checkpointing at the end of the training epoch or the end of validation
++  dirpath: null # 保存模型文件的目录。
++  filename: null # checkpoint 文件名。
++  monitor: null # 用于判断模型是否提升的日志指标名称。
++  verbose: True # 是否输出详细日志。
++  save_last: null # 是否额外始终保存最后一个 checkpoint 的副本到 last.ckpt。
++  save_top_k: 1 # 保存前 k 个最佳模型，由上面的监控指标决定。
++  mode: "min" # "max" 表示指标越高越好，也可以设为 "min"。
++  auto_insert_metric_name: True # 为 True 时，checkpoint 文件名会包含指标名。
++  save_weights_only: False # 为 True 时，只保存模型权重。
++  every_n_train_steps: null # 每隔多少个训练 step 保存一次 checkpoint。
++  train_time_interval: null # 按指定时间间隔监控并保存 checkpoint。
++  every_n_epochs: null # 每隔多少个 epoch 保存一次 checkpoint。
++  save_on_train_epoch_end: null # 是否在训练 epoch 结束而不是验证结束时执行 checkpoint。
+diff --git a/configs/callbacks/model_summary.yaml b/configs/callbacks/model_summary.yaml
+index 7cd3c6d..2e20daa 100755
+--- a/configs/callbacks/model_summary.yaml
++++ b/configs/callbacks/model_summary.yaml
+@@ -1,6 +1,6 @@
+-## Callback that prints a summary of the model to the console.
+-## Implements callback from https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.RichModelSummary.html
++## 将模型摘要打印到控制台的 callback。
++## 实现自 https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.RichModelSummary.html
+ 
+ model_summary:
+   _target_: lightning.pytorch.callbacks.RichModelSummary
+-  max_depth: 1 # the maximum depth of layer nesting that the summary will include
++  max_depth: 1 # 摘要中包含的最大层级嵌套深度。
+diff --git a/configs/callbacks/rich_progress_bar.yaml b/configs/callbacks/rich_progress_bar.yaml
+index 95c025e..b042fa0 100755
+--- a/configs/callbacks/rich_progress_bar.yaml
++++ b/configs/callbacks/rich_progress_bar.yaml
+@@ -1,6 +1,6 @@
+-## Callback to show a progress bar using the Rich library.
+-## Implements callback from https://lightning.ai/docs/pytorch/latest/api/lightning.pytorch.callbacks.RichProgressBar.html
+-## Does not work well for unbounded datasets.
++## 使用 Rich 库显示进度条的 callback。
++## 实现自 https://lightning.ai/docs/pytorch/latest/api/lightning.pytorch.callbacks.RichProgressBar.html
++## 对无边界数据集支持不佳。
+ # https://lightning.ai/docs/pytorch/latest/api/lightning.pytorch.callbacks.RichProgressBar.html
+ 
+ rich_progress_bar:
+diff --git a/configs/experiment/tiger_train_flat.yaml b/configs/experiment/tiger_train_flat.yaml
+index 6a4d9e1..d432c1b 100644
+--- a/configs/experiment/tiger_train_flat.yaml
++++ b/configs/experiment/tiger_train_flat.yaml
+@@ -218,6 +218,7 @@ model:
+   evaluator: ${eval.evaluator}
+   weight_tying: true
+   compile: false
++  should_check_prefix: false
+   decoder:
+     _target_: transformers.models.t5.modeling_t5.T5Stack
+     config:
+diff --git a/configs/extras/default.yaml b/configs/extras/default.yaml
+index 8b5b47b..23c7f9e 100755
+--- a/configs/extras/default.yaml
++++ b/configs/extras/default.yaml
+@@ -1,11 +1,11 @@
+-# disable python warnings if they annoy you
++# 如果 Python warning 影响阅读，可以关闭。
+ ignore_warnings: False
+ 
+-# ask user for tags if none are provided in the config
++# 当配置中未提供 tags 时，要求用户输入。
+ enforce_tags: True
+ 
+-# print warnings for missing configs
++# 对缺失配置打印 warning。
+ print_config_warnings: True
+ 
+-# pretty print config tree at the start of the run using Rich library
++# 运行开始时使用 Rich 库美观地打印配置树。
+ print_config: True
+diff --git a/configs/hydra/default.yaml b/configs/hydra/default.yaml
+index 468e1d5..f87a761 100755
+--- a/configs/hydra/default.yaml
++++ b/configs/hydra/default.yaml
+@@ -1,11 +1,11 @@
+ # https://hydra.cc/docs/configure_hydra/intro/
+ 
+-# enable color logging
++# 启用彩色日志。
+ defaults:
+   - override hydra_logging: colorlog
+   - override job_logging: colorlog
+ 
+-# output directory, generated dynamically on each run
++# 每次运行时动态生成输出目录。
+ run:
+   dir: ${paths.log_dir}/${task_name}/runs/${id}
+ sweep:
+@@ -15,5 +15,5 @@ sweep:
+ job_logging:
+   handlers:
+     file:
+-      # Incorporates fix from https://github.com/facebookresearch/hydra/pull/2242
++      # 引入 https://github.com/facebookresearch/hydra/pull/2242 中的修复。
+       filename: ${hydra.runtime.output_dir}/${task_name}.log
+diff --git a/configs/inference.yaml b/configs/inference.yaml
+index ddcb977..60437ce 100755
+--- a/configs/inference.yaml
++++ b/configs/inference.yaml
+@@ -1,7 +1,7 @@
+ # @package _global_
+ 
+ defaults:
+-  - model: null # we need to have model before self to override the default model parameters that are not used in inference
++  - model: null # model 必须放在 _self_ 之前，以便覆盖推理中不使用的默认模型参数。
+   - _self_
+   - paths: default
+   - logger: csv
+@@ -29,5 +29,5 @@ callbacks:
+ 
+ 
+ 
+-# passing checkpoint path is necessary for inference
++# 推理时必须传入 checkpoint 路径。
+ ckpt_path: ???
+diff --git a/configs/logger/csv.yaml b/configs/logger/csv.yaml
+index 46a255e..56ee437 100644
+--- a/configs/logger/csv.yaml
++++ b/configs/logger/csv.yaml
+@@ -1,4 +1,4 @@
+-## csv logger built in lightning
++## Lightning 内置的 csv logger。
+ 
+ csv:
+   _target_: lightning.pytorch.loggers.csv_logs.CSVLogger
+diff --git a/configs/paths/default.yaml b/configs/paths/default.yaml
+index 061a1bf..b979e40 100755
+--- a/configs/paths/default.yaml
++++ b/configs/paths/default.yaml
+@@ -1,25 +1,24 @@
+-# path to root directory
+-# this requires PROJECT_ROOT environment variable to exist
+-# you can replace it with "." if you want the root to be the current working directory
++# 根目录路径。
++# 这里要求存在 PROJECT_ROOT 环境变量。
++# 如果希望根目录就是当前工作目录，可以替换为 "."。
+ root_dir: .
+ 
+-# path to data directory
++# 数据目录路径。
+ data_dir: ???
+ 
+-# path to logging directory
++# 日志目录路径。
+ log_dir: ${paths.root_dir}/logs
+-# path to output directory, created dynamically by hydra
+-# path generation pattern is specified in `configs/hydra/default.yaml`
+-# use it to store all files generated during the run, like ckpts and metrics
++# 输出目录路径，由 Hydra 动态创建。
++# 路径生成模式在 `configs/hydra/default.yaml` 中指定。
++# 用于保存运行过程中生成的所有文件，例如 ckpt 和指标。
+ output_dir: ${hydra:runtime.output_dir}
+ 
+-# path to working directory
++# 工作目录路径。
+ work_dir: ${hydra:runtime.cwd}
+ 
+-# We define profile_dir as different than output dir as gcs paths
+-# are not supported by the profiler. At the end of the run, we copy
+-# the profiler output to the output_dir
++# profile_dir 与 output_dir 分开定义，因为 profiler 不支持 gcs 路径。
++# 运行结束后，会将 profiler 输出复制到 output_dir。
+ profile_dir: ${hydra:run.dir}/profile_output
+ 
+-# Path for metadata used to retry jobs if they fail.
++# 任务失败后用于重试的元数据路径。
+ metadata_dir: ${paths.output_dir}/metadata
+diff --git a/configs/train.yaml b/configs/train.yaml
+index 4c7a827..5073e31 100755
+--- a/configs/train.yaml
++++ b/configs/train.yaml
+@@ -1,15 +1,15 @@
+ # @package _global_
+ 
+-## Main Training configurations.
++## 主训练配置。
+ 
+-# specify here default configuration
+-# order of defaults determines the order in which configs override each other
++# 在这里指定默认配置。
++# defaults 的顺序决定各配置之间的覆盖顺序。
+ defaults:
+   - _self_
+   - data_loading: null
+   - model: null
+   - callbacks: default
+-  - logger: csv # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
++  - logger: csv # 在这里设置 logger，也可以通过命令行指定，例如 `python train.py logger=tensorboard`。
+   - trainer: default
+   - paths: default
+   - extras: default
+@@ -18,28 +18,28 @@ defaults:
+   - optim: null
+   - eval: null
+ 
+-  # experiment configs allow for version control of specific hyperparameters
+-  # e.g. best hyperparameters for given model and datamodule
++  # experiment 配置用于对特定超参数组合做版本管理。
++  # 例如某个模型和 datamodule 对应的最佳超参数。
+   - experiment: null
+ 
+-# task name, determines output directory path
++# 任务名称，用于决定输出目录路径。
+ task_name: "train"
+ 
+ id: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+-# tags to help you identify your experiments
+-# you can overwrite this in experiment configs
+-# overwrite from command line with `python train.py tags="[first_tag, second_tag]"`
++# 标签用于辅助识别实验。
++# 可以在 experiment 配置中覆盖。
++# 也可以通过命令行覆盖，例如 `python train.py tags="[first_tag, second_tag]"`。
+ tags: ["dev"]
+ 
+-# set False to skip model training
++# 设为 False 时跳过模型训练。
+ train: True
+ 
+-# evaluate on test set, using best model weights achieved during training
+-# lightning chooses best weights based on the metric specified in checkpoint callback
++# 在测试集上评估，并使用训练过程中得到的最佳模型权重。
++# Lightning 会根据 checkpoint callback 中指定的指标选择最佳权重。
+ test: True
+ 
+-# simply provide checkpoint path to resume training
++# 提供 checkpoint 路径即可恢复训练。
+ ckpt_path: null
+ 
+-# seed for random number generators in pytorch, numpy and python.random
++# PyTorch、NumPy 和 python.random 的随机数种子。
+ seed: null
+diff --git a/configs/trainer/ddp.yaml b/configs/trainer/ddp.yaml
+index 7f460d7..0d0aff8 100755
+--- a/configs/trainer/ddp.yaml
++++ b/configs/trainer/ddp.yaml
+@@ -1,12 +1,12 @@
+ defaults:
+   - default
+ 
+-# If you want to pass parameters like the static_graph flag,
+-# comment this one out and uncomment the one below.
++# 如果需要传入 static_graph 等参数，
++# 请注释掉这一行，并取消下面示例配置的注释。
+ strategy: ddp
+ 
+-# This step can provide a 5% speedup for DDP if your model
+-# works well with static graph. Uncomment the code below to enable it.
++# 如果模型适合静态图，下面的配置可让 DDP 约提速 5%。
++# 取消注释即可启用。
+ # strategy:
+ #   _target_: lightning.pytorch.strategies.DDPStrategy
+ #   static_graph: True
+diff --git a/configs/trainer/default.yaml b/configs/trainer/default.yaml
+index 4d4874d..2872baa 100755
+--- a/configs/trainer/default.yaml
++++ b/configs/trainer/default.yaml
+@@ -5,20 +5,20 @@ _target_: lightning.pytorch.trainer.Trainer
+ 
+ default_root_dir: ${paths.output_dir}
+ min_steps: 1
+-# remember that if you use gradient accumulation, this number will only be updated after each accumulation
+-# so for 40000 steps with gradient accumulation of 2, you will have 80000 batches
++# 注意：如果使用梯度累积，该步数只会在每次累积完成后更新。
++# 因此当梯度累积为 2 且 max_steps 为 40000 时，实际会处理 80000 个 batch。
+ max_steps: !!int 80000
+ max_epochs: 10
+ accelerator: cpu
+ devices: 1
+ num_nodes: 1
+-# mixed precision for extra speed-up
++# 混合精度可进一步提速。
+ precision: bf16-mixed
+ log_every_n_steps: 2500
+-# perform a validation loop every N training epochs
++# 每隔 N 个训练 step 执行一次验证循环。
+ val_check_interval: 5000
+ 
+-# set True to to ensure deterministic results
+-# makes training slower but gives more reproducibility than just setting seeds
++# 设为 True 可确保结果确定性。
++# 相比只设置随机种子，可复现性更强，但训练会更慢。
+ deterministic: False
+ accumulate_grad_batches: 1
+diff --git a/src/components/clustering_initializers.py b/src/components/clustering_initializers.py
+index b7d8e92..c0dce00 100644
+--- a/src/components/clustering_initializers.py
++++ b/src/components/clustering_initializers.py
+@@ -65,16 +65,16 @@ class RandomInitializer(ClusteringInitializer):
+         """
+         if self.initialize_on_cpu:
+             old_device = buffer.device
+-            # Move the buffer to CPU for initialization
++            # 将 buffer 移到 CPU 上做初始化，降低 GPU 显存压力。
+             buffer = buffer.to("cpu")
+ 
+         n_samples = buffer.shape[0]
+ 
+-        # Choose centroids randomly from the data points
++        # 从数据点中随机选择初始中心。
+         indices = torch.randperm(n_samples, device=buffer.device)[: self.n_clusters]
+         centroids = buffer[indices].clone().data
+         if self.initialize_on_cpu:
+-            # Move the centroids back to the original device
++            # 将中心移回原始设备。
+             centroids = centroids.to(old_device)
+ 
+         return centroids
+@@ -118,7 +118,7 @@ class KMeansPlusPlusInitInitializer(ClusteringInitializer):
+         """
+         if self.initialize_on_cpu:
+             old_device = buffer.device
+-            # Move the buffer to CPU for initialization
++            # 将 buffer 移到 CPU 上做初始化，降低 GPU 显存压力。
+             buffer = buffer.to("cpu")
+ 
+         n_samples = buffer.shape[0]
+@@ -127,21 +127,20 @@ class KMeansPlusPlusInitInitializer(ClusteringInitializer):
+             (self.n_clusters, n_features), dtype=buffer.dtype, device=buffer.device
+         )
+ 
+-        # Choose first centroid randomly
++        # 随机选择第一个中心。
+         first_centroid_idx = torch.randint(0, n_samples, (1,), device=buffer.device)
+         centroids[0] = buffer[first_centroid_idx]
+ 
+-        # Choose remaining centroids
+-        # We cannot vectorize this part because it is inherently sequential
+-        # However, we only need to execute this loop once at initialization
++        # 逐个选择剩余中心。
++        # 这部分天然依赖前一步结果，无法直接向量化；
++        # 但它只在初始化时执行一次。
+         for i in range(1, self.n_clusters):
+-            # Compute distances to the nearest existing centroid
++            # 计算每个点到最近已有中心的距离。
+             min_distances = torch.min(
+                 self.distance_function.compute(buffer, centroids[:i]), dim=1
+             )[0]
+             if min_distances.sum() == 0:
+-                # All points are already centroids, so we simply assign the remaining
+-                # centroids randomly
++                # 所有点都已经等价于中心，剩余中心直接随机分配。
+                 centroids[i:] = buffer[
+                     torch.randint(
+                         0, n_samples, (self.n_clusters - i,), device=buffer.device
+@@ -149,16 +148,15 @@ class KMeansPlusPlusInitInitializer(ClusteringInitializer):
+                 ]
+                 break
+ 
+-            # Choose the next centroid with probability proportional to distance
++            # 按距离成比例的概率选择下一个中心。
+             next_centroid_idx = torch.multinomial(min_distances, num_samples=1)
+ 
+-            # Assign the next centroid
+-            # We do not need to remove the point from buffer because the probability
+-            # will be zero for all future iterations
++            # 写入下一个中心。
++            # 无需从 buffer 中移除该点，因为后续它的采样概率会变为 0。
+             centroids[i] = buffer[next_centroid_idx]
+ 
+         if self.initialize_on_cpu:
+-            # Move the centroids back to the original device
++            # 将中心移回原始设备。
+             centroids = centroids.to(old_device)
+ 
+         return centroids
+@@ -196,7 +194,7 @@ class ClusteringModuleInitializer(ClusteringInitializer):
+         """
+         super().__init__(n_clusters=n_clusters, initialize_on_cpu=initialize_on_cpu)
+ 
+-        from src.models.modules.clustering.base_clustering_module import (  # we import here to avoid circular imports
++        from src.models.modules.clustering.base_clustering_module import (  # 在这里导入以避免循环依赖。
+             BaseClusteringModule,
+         )
+ 
+@@ -221,11 +219,11 @@ class ClusteringModuleInitializer(ClusteringInitializer):
+         self.clustering_module.on_train_start()
+         cur_centroids = self.clustering_module.get_centroids()
+         for step in range(self.max_iter):
+-            # Perform a training step
++            # 执行一次聚类模块训练步骤以更新中心。
+             self.clustering_module.model_step(buffer)
+             new_centroids = self.clustering_module.get_centroids()
+ 
+-            # Check for convergence
++            # 检查中心是否已经收敛。
+             if step > 0 and torch.allclose(
+                 cur_centroids, new_centroids, atol=self.atol
+             ):
+diff --git a/src/components/distance_functions.py b/src/components/distance_functions.py
+index f66a12c..c2699c5 100644
+--- a/src/components/distance_functions.py
++++ b/src/components/distance_functions.py
+@@ -47,38 +47,38 @@ class SquaredEuclideanDistance(DistanceFunction):
+         n2, _ = y.shape
+ 
+         if batch_size is None or batch_size >= n1:
+-            # No batching needed or batch_size is larger than n1, compute directly
+-            x_expanded = x.unsqueeze(1)  # Shape (n1, 1, d)
+-            y_expanded = y.unsqueeze(0)  # Shape (1, n2, d)
+-            sq_diffs = (x_expanded - y_expanded).pow(2)  # Shape (n1, n2, d)
+-            sq_distances = torch.sum(sq_diffs, dim=2)  # Shape (n1, n2)
++            # 不需要分 batch，或 batch_size 大于 n1 时，直接一次性计算。
++            x_expanded = x.unsqueeze(1)  # 形状为 (n1, 1, d)。
++            y_expanded = y.unsqueeze(0)  # 形状为 (1, n2, d)。
++            sq_diffs = (x_expanded - y_expanded).pow(2)  # 形状为 (n1, n2, d)。
++            sq_distances = torch.sum(sq_diffs, dim=2)  # 形状为 (n1, n2)。
+             return sq_distances
+         else:
+-            # Perform batching
++            # 分 batch 计算，降低峰值内存占用。
+             all_sq_distances = []
+-            num_batches = (n1 + batch_size - 1) // batch_size  # Ceiling division
++            num_batches = (n1 + batch_size - 1) // batch_size  # 向上取整。
+ 
+             for i in range(num_batches):
+                 start_idx = i * batch_size
+                 end_idx = min((i + 1) * batch_size, n1)
+-                x_batch = x[start_idx:end_idx]  # Shape (current_batch_size, d)
++                x_batch = x[start_idx:end_idx]  # 形状为 (current_batch_size, d)。
+ 
+-                # Expand and compute for the current batch
++                # 对当前 batch 展开并计算距离。
+                 x_batch_expanded = x_batch.unsqueeze(
+                     1
+-                )  # Shape (current_batch_size, 1, d)
+-                y_expanded = y.unsqueeze(0)  # Shape (1, n2, d) - y remains the same
++                )  # 形状为 (current_batch_size, 1, d)。
++                y_expanded = y.unsqueeze(0)  # 形状为 (1, n2, d)，y 保持不变。
+ 
+                 sq_diffs_batch = (x_batch_expanded - y_expanded).pow(
+                     2
+-                )  # Shape (current_batch_size, n2, d)
++                )  # 形状为 (current_batch_size, n2, d)。
+                 sq_distances_batch = torch.sum(
+                     sq_diffs_batch, dim=2
+-                )  # Shape (current_batch_size, n2)
++                )  # 形状为 (current_batch_size, n2)。
+ 
+                 all_sq_distances.append(sq_distances_batch)
+ 
+-            # Concatenate the results from all batches
++            # 拼接所有 batch 的结果。
+             return torch.cat(all_sq_distances, dim=0)
+ 
+ class WeightedSquaredError(torch.nn.Module):
+@@ -102,8 +102,8 @@ class WeightedSquaredError(torch.nn.Module):
+         """
+         error = x - y
+         squared_error = torch.sum(error**2, dim=-1)
+-        # If weights are not provided, use uniform weights
+-        # This is equivalent to the standard squared error loss
++        # 未提供 weights 时，等价于使用均匀权重。
++        # 这与标准 squared error loss 等价。
+         if weights is None:
+             return torch.sum(squared_error)
+         return torch.sum(weights * squared_error)
+diff --git a/src/components/eval_metrics.py b/src/components/eval_metrics.py
+index 41db2d0..36813f5 100755
+--- a/src/components/eval_metrics.py
++++ b/src/components/eval_metrics.py
+@@ -6,7 +6,7 @@ import torchmetrics
+ from torchmetrics.metric import Metric
+ from torchmetrics.utilities.distributed import gather_all_tensors
+ 
+-## Custom Metrics
++## 自定义指标
+ 
+ 
+ class CustomMeanReductionMetric(torchmetrics.Metric):
+@@ -20,17 +20,16 @@ class CustomMeanReductionMetric(torchmetrics.Metric):
+         self.total_values = 0
+ 
+     def compute(self) -> torch.Tensor:
+-        # Aggregates the metric accross workers and returns the final value
++        # 聚合所有 worker 上的指标并返回最终值。
+         metric_values_tensor = torch.tensor(self.metric_values).to(self.device)
+         total_values_tensor = torch.tensor(self.total_values).to(self.device)
+-        # Compute final metric
++        # 计算最终指标。
+         if self.total_values == 0:
+             return torch.tensor(0.0, device=self.device)
+-        # Checks if using more than one GPU
+-        # If so, gather all metric values and total values from all GPUs. Else, return the current
+-        # worker's metric value
++        # 如果使用多 GPU，则收集所有 GPU 上的指标值和样本数；
++        # 否则直接使用当前 worker 的指标值。
+         if torch.distributed.is_available() and torch.distributed.is_initialized():
+-            # Gather all metric values and total values from all GPUs
++            # 从所有 GPU 收集指标值和样本数。
+ 
+             metric_values_tensor_list = [
+                 t.unsqueeze(0) if t.dim() == 0 else t
+@@ -93,7 +92,7 @@ class NDCG(CustomRetrievalMetric):
+         topk_indices = torch.topk(preds, self.top_k)[1]
+         topk_true = target.gather(1, topk_indices)
+ 
+-        # Compute DCG
++        # 计算 DCG。
+         dcg = torch.sum(
+             topk_true
+             / torch.log2(
+@@ -102,7 +101,7 @@ class NDCG(CustomRetrievalMetric):
+             dim=1,
+         )
+ 
+-        # Compute IDCG
++        # 计算 IDCG。
+         ideal_indices = torch.topk(target, self.top_k)[1]
+         ideal_dcg = torch.sum(
+             target.gather(1, ideal_indices)
+@@ -112,7 +111,7 @@ class NDCG(CustomRetrievalMetric):
+             dim=1,
+         )
+ 
+-        # Handle cases where IDCG is zero
++        # 处理 IDCG 为 0 的情况，避免除零。
+         ndcg = dcg / torch.where(ideal_dcg == 0, torch.ones_like(ideal_dcg), ideal_dcg)
+         return ndcg
+ 
+@@ -133,9 +132,9 @@ class Recall(CustomRetrievalMetric):
+             torch.tensor(self.top_k, device=self.device)
+         ).clamp(
+             min=1
+-        )  # Use clamp to avoid zero
++        )  # 使用 clamp 避免分母为 0。
+         return recall
+-## Evaluators
++## 评估器
+ 
+ class Evaluator:
+     def __init__(self, metrics: Dict[str, Metric], *args, **kwargs):
+@@ -193,19 +192,19 @@ class RetrievalEvaluator(Evaluator):
+                 num_of_candidates=num_of_candidates,
+                 num_negatives=self.num_negatives,
+             )
+-            # we +1 here because we need to include the positive sample
++            # 这里加 1 是为了把正样本也纳入候选集合。
+             num_of_candidates = self.num_negatives + 1
+             pos_embeddings = key_embeddings[labels]
+             key_embeddings = key_embeddings[inbatch_negatives]
+-            # key_embeddings shape: (bsz, num_negatives+1, emb_dim)
++            # key_embeddings 形状为 (bsz, num_negatives + 1, emb_dim)。
+             key_embeddings = torch.cat(
+                 [pos_embeddings.unsqueeze(1), key_embeddings], dim=1
+             )
+-            # the positive index will always be 0 because the pos embedding will always be the first one.
++            # 正样本 embedding 总是放在第一个位置，因此正样本索引恒为 0。
+             labels = torch.zeros(num_of_samples).long()
+ 
+-        # following examples from https://lightning.ai/docs/torchmetrics/stable/retrieval/precision.html
+-        # indexes refers to the mask of the labels
++        # 参考 https://lightning.ai/docs/torchmetrics/stable/retrieval/precision.html 中的示例。
++        # indexes 表示 labels 对应的分组 mask。
+         indexes = torch.arange(0, query_embeddings.shape[0])
+         expanded_indexes = (
+             indexes.unsqueeze(-1).expand(num_of_samples, num_of_candidates).reshape(-1)
+@@ -234,22 +233,22 @@ class RetrievalEvaluator(Evaluator):
+                 indexes=expanded_indexes.to(preds.device),
+             )
+ 
+-    # this method samples random negative samples from the whole vocab
++    # 从整个 vocab 中随机采样负样本。
+     def sample_negative_ids_from_vocab(
+         self,
+         num_of_samples: int,
+         num_of_candidates: int,
+         num_negatives: int,
+     ) -> torch.Tensor:
+-        # num_of_samples: batch size
+-        # num_of_candidates: number of total vocabs
+-        # num_negatives: number of negative samples
++        # num_of_samples：批大小。
++        # num_of_candidates：总 vocab 数。
++        # num_negatives：负样本数量。
+ 
+-        # we do randint to accelerate the negative sampling
+-        # this could have collision with positive pairs but the chance is very low
++        # 使用 randint 加速负采样。
++        # 这可能与正样本发生碰撞，但概率很低。
+ 
+-        # TODO (Clark): in the future we might need to have non-collision negative sampling
+-        # when K in top-k is very small (e.g., hits@1) and num_negatives is very large
++        # TODO（Clark）：当 top-k 中的 K 很小（例如 hits@1）且负样本很多时，
++        # 后续可能需要无碰撞负采样。
+         negative_candidates = torch.randint(
+             self.placeholder_token_buffer,
+             num_of_candidates,
+@@ -289,14 +288,13 @@ class SIDRetrievalEvaluator(Evaluator):
+         labels = labels.reshape(batch_size, 1, num_hierarchies)
+         preds = marginal_probs.reshape(-1)
+ 
+-        # check if the generated IDs contain the labels
+-        # if so, we get the coordinates of the matched IDs
++        # 检查生成的 ID 是否包含 label；如果包含，则取出匹配坐标。
+         matched_id_coord = torch.all((generated_ids == labels), dim=2).nonzero()
+ 
+-        # we initialize the ground truth as all false
++        # 初始化 ground truth，全设为 False。
+         target = torch.zeros(batch_size, num_candidates).bool()
+ 
+-        # we set the matched IDs to true if they are in the generated IDs
++        # 如果生成 ID 中存在匹配 label，则把对应位置设为 True。
+         target[matched_id_coord[:, 0], matched_id_coord[:, 1]] = True
+         target = target.reshape(-1)
+         expanded_indexes = (
+diff --git a/src/components/loss_functions.py b/src/components/loss_functions.py
+index 48f4753..772818c 100755
+--- a/src/components/loss_functions.py
++++ b/src/components/loss_functions.py
+@@ -53,9 +53,9 @@ class FullBatchCrossEntropyLoss(nn.Module):
+         torch.Tensor
+             The contrastive loss.
+         """
+-        # get representation of masked tokens
+-        # label_locations[:, 0] refers to the index of sequences
+-        # label_locations[:, 1] refers to the index of tokens in the sequences
++        # 取出被 mask token 的表示。
++        # label_locations[:, 0] 表示序列索引。
++        # label_locations[:, 1] 表示序列中的 token 索引。
+         query_embeddings = query_embeddings[
+             label_locations[:, 0], label_locations[:, 1]
+         ]
+@@ -91,8 +91,8 @@ class WeightedSquaredError(torch.nn.Module):
+         """
+         error = x - y
+         squared_error = torch.sum(error**2, dim=-1)
+-        # If weights are not provided, use uniform weights
+-        # This is equivalent to the standard squared error loss
++        # 未提供 weights 时，等价于使用均匀权重。
++        # 这与标准 squared error loss 等价。
+         if weights is None:
+             return torch.sum(squared_error)
+         return torch.sum(weights * squared_error)
+diff --git a/src/components/network_blocks/hf_language_model.py b/src/components/network_blocks/hf_language_model.py
+index cbc4ee9..05f3bfe 100755
+--- a/src/components/network_blocks/hf_language_model.py
++++ b/src/components/network_blocks/hf_language_model.py
+@@ -49,7 +49,7 @@ class HFLanguageModel(nn.Module):
+             postprocessed_embeddings: Postprocessed embeddings.
+             embeddings: Last hidden states if return_last_hidden_states is True.
+         """
+-        # TODO(lcollins2): Generalize this to handle other types of inputs
++        # TODO（lcollins2）：泛化到其它输入类型。
+         outputs: BaseModelOutput = self.huggingface_model(
+             input_ids=input_ids, attention_mask=attention_mask
+         )
+diff --git a/src/components/optimizer.py b/src/components/optimizer.py
+index 841bcf1..6c0c382 100644
+--- a/src/components/optimizer.py
++++ b/src/components/optimizer.py
+@@ -25,9 +25,9 @@ class PassThroughOptimizer(Optimizer):
+                     p.grad.zero_()
+ 
+     def state_dict(self):
+-        # needed for lightning checkpointing
++        # Lightning checkpoint 需要该接口。
+         return {}
+ 
+     def load_state_dict(self, state_dict):
+-        # needed for lightning checkpointing
++        # Lightning checkpoint 需要该接口。
+         pass
+diff --git a/src/components/quantization_strategies.py b/src/components/quantization_strategies.py
+index 2b120bd..dfbad2e 100644
+--- a/src/components/quantization_strategies.py
++++ b/src/components/quantization_strategies.py
+@@ -153,7 +153,7 @@ class RotationTrickQuantization(QuantizationStrategy):
+         Returns:
+             The transformed batch embeddings of shape (batch_size, embedding_dim).
+         """
+-        # Detach tensors that will be used in the transformation
++        # 对变换中只作为常量使用的张量 detach。
+         quantized_embeddings = quantized_embeddings.detach()
+         detached_batch = batch.detach()
+ 
+@@ -161,29 +161,29 @@ class RotationTrickQuantization(QuantizationStrategy):
+             quantized_embeddings, dim=-1
+         ).unsqueeze(
+             1
+-        )  # batch_size x 1
++        )  # 形状为 batch_size x 1。
+         batch_norms = torch.linalg.vector_norm(detached_batch, dim=-1).unsqueeze(
+             1
+-        )  # batch_size x 1
+-        lambda_ = quantized_norms / batch_norms  # batch_size x 1
++        )  # 形状为 batch_size x 1。
++        lambda_ = quantized_norms / batch_norms  # 形状为 batch_size x 1。
+ 
+-        normalized_batch = detached_batch / batch_norms  # batch_size x embedding_dim
++        normalized_batch = detached_batch / batch_norms  # 形状为 batch_size x embedding_dim。
+         normalized_embeddings = (
+             quantized_embeddings / quantized_norms
+-        )  # batch_size x embedding_dim
++        )  # 形状为 batch_size x embedding_dim。
+ 
+         normalized_sum = F.normalize(
+             normalized_batch + normalized_embeddings, p=2, dim=1
+         )
+-        batch = batch.unsqueeze(1)  # -> batch_size x 1 x embedding_dim
++        batch = batch.unsqueeze(1)  # 形状变为 batch_size x 1 x embedding_dim。
+ 
+-        # the following implements equation 4.2 in https://arxiv.org/abs/2410.06424
++        # 下方实现 https://arxiv.org/abs/2410.06424 中的公式 4.2。
+         sum_projection = (
+             batch @ normalized_sum.unsqueeze(2) @ normalized_sum.unsqueeze(1)
+-        )  # batch_size x 1 x embedding_dim
++        )  # 形状为 batch_size x 1 x embedding_dim。
+         rescaled_embeddings = (
+             batch @ normalized_batch.unsqueeze(2) @ normalized_embeddings.unsqueeze(1)
+-        )  # batch_size x 1 x embedding_dim
++        )  # 形状为 batch_size x 1 x embedding_dim。
+         return (
+             lambda_ * (batch - 2 * sum_projection + 2 * rescaled_embeddings).squeeze()
+         )
+@@ -214,5 +214,5 @@ class RotationTrickQuantization(QuantizationStrategy):
+         ids, embeddings = self.get_nearest_neighbors(codebook, batch)
+         reconstruction_loss_embeddings = self.rotate_and_scale_batch(
+             batch, embeddings
+-        )  # batch_size x embedding_dim
++        )  # 形状为 batch_size x embedding_dim。
+         return ids, embeddings, reconstruction_loss_embeddings
+diff --git a/src/components/scheduler.py b/src/components/scheduler.py
+index ecfbd0f..2619a2e 100755
+--- a/src/components/scheduler.py
++++ b/src/components/scheduler.py
+@@ -51,10 +51,10 @@ class WarmupCosineSchedulerNonzeroMin(torch.optim.lr_scheduler.LambdaLR):
+         step: int,
+     ) -> float:
+         """Return the factor to mulitply the initial learning rate with."""
+-        if step < self.warmup_steps:  # linear warm-up
++        if step < self.warmup_steps:  # 线性 warm-up。
+             return float(step) / float(max(1, self.warmup_steps))
+         if step <= self.scheduler_steps:
+-            # cosine decay
++            # 余弦衰减。
+             decay_ratio = float(step - self.warmup_steps) / float(
+                 max(1, self.scheduler_steps - self.warmup_steps)
+             )
+@@ -62,5 +62,5 @@ class WarmupCosineSchedulerNonzeroMin(torch.optim.lr_scheduler.LambdaLR):
+                 1.0 + math.cos(math.pi * float(self.num_cycles) * 2.0 * decay_ratio)
+             )
+             return max(self.min_ratio, self.min_ratio + coeff * (1 - self.min_ratio))
+-        else:  # current_step > self.scheduler_steps
++        else:  # 当前 step 大于 self.scheduler_steps。
+             return self.min_ratio
+diff --git a/src/components/training_loop_functions.py b/src/components/training_loop_functions.py
+index 6902030..b12b592 100644
+--- a/src/components/training_loop_functions.py
++++ b/src/components/training_loop_functions.py
+@@ -67,12 +67,12 @@ def scale_loss_by_world_size_for_initialization_training_loop(
+         is_initialized: A boolean indicating whether the model is already initialized.
+     """
+     if not is_initialized:
+-        # Perform special initialization
+-        # We scale the loss by the world size for proper initialization
++        # 执行特殊初始化。
++        # 将 loss 乘以 world_size，以抵消 DDP 对梯度的平均。
+         opt = initalization_optimizer(model.parameters(), lr=initalization_optimizer_lr)
+         loss = loss * world_size
+     else:
+-        # Use the default training loop
++        # 初始化完成后使用默认训练循环。
+         opt = model.optimizers()
+     opt.zero_grad()
+     model.manual_backward(loss)
+diff --git a/src/data/loading/components/collate_functions.py b/src/data/loading/components/collate_functions.py
+index a73d67e..885196b 100755
+--- a/src/data/loading/components/collate_functions.py
++++ b/src/data/loading/components/collate_functions.py
+@@ -18,8 +18,8 @@ def identity_collate_fn(batch: Any) -> Any:
+ 
+ 
+ def collate_with_sid_causal_duplicate(
+-    # batch can be a list or a dict
+-    # this function is used to create the generate contiguous sequences as data augmentation to improve the performance
++    # batch 可以是 list，也可以是 dict。
++    # 该函数通过生成连续子序列做数据增强，用于提升训练效果。
+     batch: Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]],
+     sequence_field_name: str,
+     sid_hierarchy: int,
+@@ -29,7 +29,7 @@ def collate_with_sid_causal_duplicate(
+     padding_token: int = 0,
+     oov_token: Optional[
+         int
+-    ] = None,  # If oov_token is passed, we remove it from the sequence
++    ] = None,  # 如果传入 oov_token，则从序列中移除它。
+     max_batch_size: int = 128,
+ ) -> Tuple[SequentialModelInputData, SequentialModuleLabelData]:
+     """
+@@ -64,7 +64,7 @@ def collate_with_sid_causal_duplicate(
+     if isinstance(batch, list):
+         batch = combine_list_of_tensor_dicts(batch)  # type: ignore
+ 
+-    # calculating the total number of contiguous sub-sequences in the batch
++    # 计算当前 batch 中所有可生成的连续子序列数量。
+     total_num_seqs = torch.sum(
+         (
+             (
+@@ -95,7 +95,7 @@ def collate_with_sid_causal_duplicate(
+         for end_index in end_indices:
+             start_indices = torch.arange(
+                 0, end_index - 2 * sid_hierarchy + 1, sid_hierarchy
+-            )  # we have a -2 here because we want to have at least two items in the sequence
++            )  # 这里减 2，是为了保证每个子序列至少包含两个 item。
+             for start_index in start_indices:
+                 if current_idx in select_seqs:
+                     new_batch[sequence_field_name].append(
+@@ -117,14 +117,14 @@ def collate_with_sid_causal_duplicate(
+ 
+ 
+ def collate_fn_inference_for_sequence(
+-    # batch can be a list or a dict
++    # batch 可以是 list，也可以是 dict。
+     batch: Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]],
+     id_field_name: str,
+     sequence_length: int = 200,
+     padding_token: int = 0,
+     oov_token: Optional[
+         int
+-    ] = None,  # If oov_token is passed, we remove it from the sequence
++    ] = None,  # 如果传入 oov_token，则从序列中移除它。
+     **kwargs,
+ ) -> SequentialModelInputData:
+     """The collate function passed to inference dataloader for inference with sequential data.
+@@ -155,22 +155,22 @@ def collate_fn_inference_for_sequence(
+ 
+     for field_name, field_sequence in batch.items():  # type: ignore
+         if field_name in id_field_name:
+-            # We use the id field as the user_id_list so predictions can be mapped back to the original id.
++            # 将 id 字段保存为 user_id_list，便于将预测结果映射回原始 id。
+             model_input_data.user_id_list = field_sequence
+ 
+-        # TODO (lneves): Allow for non-sequential data to be passed as a feature.
++        # TODO（lneves）：允许将非序列数据作为特征传入。
+         current_sequence = field_sequence  # type: ignore
+         if oov_token:
+-            # removing the oov token # TODO (Clark): in the future we can add special OOV handling
++            # 移除 oov token。TODO（Clark）：后续可加入专门的 OOV 处理。
+             current_sequence = [
+                 sequence[sequence != oov_token] for sequence in field_sequence
+             ]
+-        # 1. in-batch padding s.t. all sequences have the same length and in the format of pt tensor
++        # 1. 先在 batch 内 padding，使所有序列长度一致并转为 PyTorch tensor。
+         current_sequence = pad_sequence(
+             current_sequence, batch_first=True, padding_value=padding_token
+         )
+ 
+-        # 2. padding or trimming the sequence to the desired length for training
++        # 2. 再 padding 或截断到推理所需的目标长度。
+         current_sequence = pad_or_trim_sequence(
+             padded_sequence=current_sequence,
+             sequence_length=sequence_length,
+@@ -179,14 +179,14 @@ def collate_fn_inference_for_sequence(
+         model_input_data.transformed_sequences[field_name] = current_sequence
+ 
+         if field_name not in id_field_name and model_input_data.mask is None:
+-            # if a field is not id, then it means its the real sequence we want calculate attention mask for it
++            # 第一个非 id 字段被视为真实序列，用它计算 attention mask。
+             model_input_data.mask = (current_sequence != padding_token).long()
+ 
+     return model_input_data  # type: ignore
+ 
+ 
+ def collate_fn_train(
+-    # batch can be a list or a dict
++    # batch 可以是 list，也可以是 dict。
+     batch: Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]],
+     labels: Dict[str, callable],  # type: ignore
+     sequence_length: int = 200,
+@@ -194,7 +194,7 @@ def collate_fn_train(
+     padding_token: int = 0,
+     oov_token: Optional[
+         int
+-    ] = None,  # If oov_token is passed, we remove it from the sequence
++    ] = None,  # 如果传入 oov_token，则从序列中移除它。
+     data_augmentation_functions: Optional[
+         List[Dict[str, callable]]
+     ] = None,  # type: ignore
+@@ -231,26 +231,26 @@ def collate_fn_train(
+     model_label_data = SequentialModuleLabelData()
+ 
+     for field_name, field_sequence in batch.items():  # type: ignore
+-        # TODO (lneves): Allow for non-sequential data to be passed as a feature.
++        # TODO（lneves）：允许将非序列数据作为特征传入。
+         current_sequence = field_sequence  # type: ignore
+         if oov_token:
+-            # removing the oov token # TODO (Clark): in the future we can add special OOV handling
++            # 移除 oov token。TODO（Clark）：后续可加入专门的 OOV 处理。
+             current_sequence = [
+                 sequence[sequence != oov_token] for sequence in field_sequence
+             ]
+-        # 1. in-batch padding s.t. all sequences have the same length and in the format of pt tensor
++        # 1. 先在 batch 内 padding，使所有序列长度一致并转为 PyTorch tensor。
+         current_sequence = pad_sequence(
+             current_sequence, batch_first=True, padding_value=padding_token
+         )
+ 
+-        # 2. padding or trimming the sequence to the desired length for training
++        # 2. 再 padding 或截断到训练所需的目标长度。
+         current_sequence = pad_or_trim_sequence(
+             padded_sequence=current_sequence,
+             sequence_length=sequence_length,
+             padding_token=padding_token,
+         )
+ 
+-        # creating labels if the field is in the labels list
++        # 如果该字段配置了 label 函数，则生成训练标签。
+         if field_name in labels:
+             label_function = labels[field_name].transform
+             label_function_output: LabelFunctionOutput = label_function.transform_label(
+@@ -271,8 +271,8 @@ def collate_fn_train(
+         else:
+             model_input_data.transformed_sequences[field_name] = current_sequence
+ 
+-        # Currently supports a single masking per sequence
+-        # TODO (lneves): Evaluate if this works or if we should have one mask per feature.
++        # 当前每条序列只支持一个 mask。
++        # TODO（lneves）：评估是否应为每个特征单独维护 mask。
+         if model_input_data.mask is None:
+             model_input_data.mask = (current_sequence != padding_token).long()
+ 
+@@ -280,7 +280,7 @@ def collate_fn_train(
+ 
+ 
+ def collate_fn_items(
+-    # batch can be a list or a dict
++    # batch 可以是 list，也可以是 dict。
+     batch: Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]],
+     item_id_field: str,
+     feature_to_input_name: Dict[str, str],  # type: ignore
+@@ -307,7 +307,7 @@ def collate_fn_items(
+     """
+     if isinstance(batch, list):
+         batch = combine_list_of_tensor_dicts(batch)  # type: ignore
+-        # does not change shape of text tokens
++        # 不改变文本 token 的形状。
+ 
+     model_input_data = ItemData()
+ 
+@@ -316,9 +316,8 @@ def collate_fn_items(
+             model_input_data.item_ids = list(field_value)
+ 
+         else:
+-            # In this case, field_value is a list of tensors, each representing the
+-            # features of a single item. We stack these tensors along the batch
+-            # dimension to create a single tensor for the batch of items.
++            # 此时 field_value 是一个 tensor 列表，每个 tensor 表示一个 item 的特征。
++            # 沿 batch 维堆叠后，得到当前 item batch 对应的单个 tensor。
+             field_value = torch.stack(field_value, dim=0)
+             model_input_data.transformed_features[
+                 feature_to_input_name[field_name]
+diff --git a/src/data/loading/components/custom_dataloader.py b/src/data/loading/components/custom_dataloader.py
+index 9b9da7a..ee9fd54 100755
+--- a/src/data/loading/components/custom_dataloader.py
++++ b/src/data/loading/components/custom_dataloader.py
+@@ -19,8 +19,8 @@ class _MultiProcessingDataLoaderIterWithRetry(_MultiProcessingDataLoaderIter):
+         self._max_retries = max_retries
+ 
+     def _try_get_data(self, timeout=_utils.MP_STATUS_CHECK_INTERVAL):
+-        # Note that the max wait time will be timeout * (max_retries + 1) due to original call + all retries.
+-        # This won't fix issues related to corrupted data, but can help with network issues.
++        # 最大等待时间为 timeout * (max_retries + 1)，包含原始调用和所有重试。
++        # 这不能修复数据损坏问题，但可以缓解网络抖动导致的超时。
+         retries = 0
+         for _ in range(self._max_retries):
+             start_time = time.monotonic()
+@@ -28,10 +28,10 @@ class _MultiProcessingDataLoaderIterWithRetry(_MultiProcessingDataLoaderIter):
+             if status:
+                 return (True, data)
+             end_time = time.monotonic()
+-            # If it took less than the timeout time, it means the issue was an empty queue.
+-            # If that happens or if we have reached our last retry, we return False. Else, we retry.
+-            # We need this because original _try_get_data will return False if the queue is empty or
+-            # if the timeout is reached. We need a way to differentiate and only retry if there is a timeout.
++            # 如果耗时小于 timeout，说明失败原因是队列为空。
++            # 队列为空或已经到达最后一次重试时返回 False，否则继续重试。
++            # 原始 _try_get_data 在队列为空和超时时都会返回 False，
++            # 因此这里用耗时区分两者，只在真正超时时重试。
+             if end_time - start_time < timeout or retries + 1 == self._max_retries:
+                 return (False, None)
+             command_line_logger.warning(
+diff --git a/src/data/loading/components/dataloading.py b/src/data/loading/components/dataloading.py
+index 90ffa88..3cc5d03 100755
+--- a/src/data/loading/components/dataloading.py
++++ b/src/data/loading/components/dataloading.py
+@@ -44,7 +44,7 @@ class BaseDataset:
+         self.list_of_file_paths = list_of_files
+ 
+     def set_distributed_params(self, total_workers: int, global_worker_id: int):
+-        # TODO (lneves): figure out how to do this in LightningDataModule
++        # TODO（lneves）：确认如何在 LightningDataModule 中更自然地传递这些参数。
+         self.total_workers = total_workers
+         self.global_worker_id = global_worker_id
+ 
+@@ -52,11 +52,11 @@ class BaseDataset:
+         worker_info = get_worker_info()
+ 
+         if worker_info is None:
+-            # Single-worker setup (no multiprocessing)
++            # 单 worker 设置，即未启用多进程。
+             worker_id = 0
+             num_workers = 1
+         else:
+-            # Multi-worker setup
++            # 多 worker 设置。
+             worker_id = worker_info.id
+             num_workers = worker_info.num_workers
+ 
+@@ -67,7 +67,7 @@ class BaseDataset:
+         return worker_id, num_workers
+ 
+     def get_list_of_worker_files(self):
+-        # Get information about worker and then separate only files that belong to this worker
++        # 获取当前 worker 信息，并筛出属于该 worker 的文件。
+         worker_id, num_workers = self.get_worker_id_and_num_workers()
+         if self.assign_all_files_per_worker:
+             worker_files = self.list_of_file_paths
+@@ -108,20 +108,20 @@ class UnboundedSequenceIterable(BaseDataset, IterableDataset):
+         self.dataset_to_iterate = None
+ 
+     def setup(self):
+-        # We update each worker's data iterator with the files just for that worker.
++        # 为每个 worker 的数据迭代器设置仅属于该 worker 的文件。
+         self.data_iterator.update_list_of_file_paths(self.get_list_of_worker_files())
+         self.data_iterator = (
+-            # here we use global_dataloader_worker_id as the seed for shuffling
+-            # this doesn't matter for the case where workers have non-overlapping files
+-            # but it does matter for the case where workers have all files
+-            # (e.g. when using assign_all_files_per_worker)
+-            # the same seed is used for all workers would cause duplicated examples returned by different workers
++            # 这里使用 global_dataloader_worker_id 作为 shuffle seed。
++            # 当不同 worker 读取不同文件时影响不大；
++            # 但当所有 worker 都能访问全部文件时很重要，
++            # 例如 assign_all_files_per_worker=True。
++            # 如果所有 worker 使用相同 seed，不同 worker 会返回重复样本。
+             self.data_iterator.shuffle(seed=self.global_dataloader_worker_id)
+             if self.should_shuffle_rows
+             else self.data_iterator
+         )
+         self.data_iterator.should_shuffle_rows = self.should_shuffle_rows
+-        # We provide the flexibility to iterate per row, if per row preprocessing is needed, or per batch.
++        # 根据预处理需要，支持按行迭代或按 batch 迭代。
+         self.dataset_to_iterate = (
+             self.data_iterator.iterrows()
+             if self.dataset_config.iterate_per_row
+@@ -135,10 +135,9 @@ class UnboundedSequenceIterable(BaseDataset, IterableDataset):
+ 
+     def __iter__(self):
+         if self.dataset_to_iterate is None:
+-            # If it has not been set up, it means it is a forkserver worker. We need to set it up.
++            # 如果还未 setup，说明当前可能是 forkserver worker，需要在 worker 内初始化。
+             self.setup()
+-        # If the dataset is for training, we want to keep iterating over the dataset infinitely.
+-        # On a streaming dataset, we will always be on Epoch 0.
++        # 训练集需要无限迭代；对于流式数据集来说，始终处在 Epoch 0。
+         finished_iteration = False
+         while not finished_iteration:
+ 
+@@ -153,11 +152,11 @@ class UnboundedSequenceIterable(BaseDataset, IterableDataset):
+                         break
+                 if row_or_batch:
+                     yield row_or_batch
+-            # if the dataset is not for training, we stop the loop. Otherwise, we continue.
++            # 非训练阶段只遍历一次；训练阶段继续重新 setup 并迭代。
+             finished_iteration = not self.is_for_training
+             if not finished_iteration:
+                 self.setup()
+-        # We reset the dataset to iterate to None, so that it is set up again in the next iteration.
+-        # This is required for validation when persitent_workers = True.
++        # 将 dataset_to_iterate 重置为 None，下一轮迭代时会重新 setup。
++        # 当 validation 使用 persistent_workers=True 时，这一步是必需的。
+         self.dataset_to_iterate = None
+         return None
+diff --git a/src/data/loading/components/interfaces.py b/src/data/loading/components/interfaces.py
+index e9166a0..c5515a5 100755
+--- a/src/data/loading/components/interfaces.py
++++ b/src/data/loading/components/interfaces.py
+@@ -183,10 +183,10 @@ class SequentialModuleLabelData:
+     ----------
+     labels: Dict[str, torch.Tensor]
+         Dictionary of label_name to label tensor.
+-        Label tensor is the shape of mask size # long tensor
++        label tensor 的形状为 mask size，类型为 long tensor。
+     label_location: Dict[str, torch.Tensor]
+         Dictionary of label_name to label location tensor.
+-        Label location tensor is the shape of mask_size, 2 as it contains coordinates # long tensor
++        label location tensor 的形状为 (mask_size, 2)，用于存放坐标，类型为 long tensor。
+     """
+ 
+     labels: Dict[str, torch.Tensor] = field(default_factory=dict)
+@@ -213,7 +213,7 @@ class SequentialModelInputData:
+     user_id_list: Union[torch.Tensor, List[str], None] = None
+     transformed_sequences: Dict[str, torch.Tensor] = field(default_factory=dict)
+     mask: torch.Tensor = (
+-        None  # Single mask if needed as all sequences are padded the same way.
++        None  # 如果所有序列 padding 方式一致，需要时只保留一个 mask。
+     )
+ 
+ 
+diff --git a/src/data/loading/components/iterators.py b/src/data/loading/components/iterators.py
+index f713b32..27bb1d1 100755
+--- a/src/data/loading/components/iterators.py
++++ b/src/data/loading/components/iterators.py
+@@ -7,14 +7,13 @@ from typing import Callable, Dict, List
+ from src.utils.decorators import retry
+ from src.utils.file_utils import open_pyarrow_file
+ 
+-# We suppress the tensorflow warnings. Needs to happend before the tf import
++# 抑制 TensorFlow warning；必须发生在导入 tensorflow 之前。
+ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+ 
+ import tensorflow as tf
+ 
+-tf.config.set_visible_devices([], "GPU")  # Disable all for tensorflow
+-# if GPU version of TF installed,
+-# it will automatically occupy the full GPU memory
++tf.config.set_visible_devices([], "GPU")  # 禁用 TensorFlow 对所有 GPU 的访问。
++# 如果安装的是 GPU 版 TensorFlow，它会自动占用完整 GPU 显存。
+ 
+ 
+ class RawDataIterator(ABC):
+@@ -144,14 +143,12 @@ class TFRecordIterator(RawDataIterator):
+             [self.list_of_file_paths], compression_type="GZIP"
+         )
+         if self.should_shuffle_rows:
+-            # the buffer here is the number of records to shuffle
+-            # the larger the buffer, the more memory it will use
+-            # too large might cause OOM
++            # 这里的 buffer 表示参与 shuffle 的 record 数量。
++            # buffer 越大，内存占用越高；过大可能导致 OOM。
+             raw_dataset = raw_dataset.shuffle(buffer_size=128)
+ 
+         self.initialize_feature_description(raw_dataset)
+-        # We create an iterator and manually iterate to allow for retrying the
+-        # "next" operation in case of a failure.
++        # 手动创建并推进 iterator，便于在 next 操作失败时重试。
+         dataset_iterator = iter(raw_dataset)
+         curr_example = self._get_next_example(dataset_iterator)
+         while curr_example:
+@@ -166,13 +163,12 @@ class TFRecordIterator(RawDataIterator):
+         )
+ 
+         if self.should_shuffle_rows:
+-            # the buffer here is the number of records to shuffle
+-            # the larger the buffer, the more memory it will use
+-            # too large might cause OOM
++            # 这里的 buffer 表示参与 shuffle 的 record 数量。
++            # buffer 越大，内存占用越高；过大可能导致 OOM。
+             raw_dataset = raw_dataset.shuffle(buffer_size=128)
+ 
+         self.initialize_feature_description(raw_dataset)
+-        # to avoid the issues with tf record warnings, we drop the last instances
++        # 为避免 TFRecord warning 相关问题，这里丢弃最后不足一个 batch 的样本。
+         batch_function = (
+             raw_dataset.ragged_batch if self.use_ragged_tensor else raw_dataset.batch
+         )
+@@ -193,7 +189,7 @@ class TFRecordIterator(RawDataIterator):
+             yield example
+             curr_batch = self._get_next_example(dataset_iterator)
+ 
+-    # dynamic inferring the feature description of tfrecord files
++    # 动态推断 tfrecord 文件的 feature description。
+     def infer_feature_type(self, example_proto: tf.Tensor) -> dict:
+         feature_description = {}
+         tf_feature_type = (
+@@ -211,15 +207,15 @@ class TFRecordIterator(RawDataIterator):
+                     raise ValueError("Unknown feature type")
+         return feature_description
+ 
+-    # parsing the tfrecord files from bytes
++    # 从字节内容解析 tfrecord。
+     def parse_tfrecord(self, record: tf.Tensor) -> tf.Tensor:
+         example = tf.train.Example()
+         example.ParseFromString(record.numpy())  # type: ignore
+         return example
+ 
+     def shuffle(self, seed=42) -> RawDataIterator:
+-        # TODO(lneves): Unify the shuffle method for all iterators
+-        # Currently this one shuffles only files, parquet shuffles rows.
++        # TODO（lneves）：统一所有 iterator 的 shuffle 方法。
++        # 当前该 iterator 只 shuffle 文件，parquet iterator 则 shuffle 行。
+         random.seed(seed)
+         random.shuffle(self.list_of_file_paths)  # type: ignore
+         return self
+diff --git a/src/data/loading/components/label_function.py b/src/data/loading/components/label_function.py
+index 22f64c2..7d1d1e8 100755
+--- a/src/data/loading/components/label_function.py
++++ b/src/data/loading/components/label_function.py
+@@ -148,39 +148,39 @@ class NextKTokenMasking(LabelFunction):
+         """
+         content_mask = sequence != padding_token
+ 
+-        # check each sequence in batch is greater than next_k + 1
+-        unpadded_seq_lengths = content_mask.sum(1)  # shape: (batch_size,)
++        # 检查 batch 中每条序列的真实长度是否都大于 next_k + 1。
++        unpadded_seq_lengths = content_mask.sum(1)  # 形状为 (batch_size,)。
+         if torch.any(unpadded_seq_lengths < self.next_k + 1):
+             raise ValueError(
+                 f"Sequence lengths: {unpadded_seq_lengths[unpadded_seq_lengths < self.next_k + 1]} should be greater than next_k + 1: {self.next_k + 1}"
+             )
+ 
+-        # for each row, we want elements from unpadded_seq_lengths - next_k to unpadded_seq_lengths - 1 as labels
+-        label_start_indices = unpadded_seq_lengths - self.next_k  # shape: (batch_size,)
++        # 对每一行，取 [unpadded_seq_lengths - next_k, unpadded_seq_lengths - 1] 作为 labels。
++        label_start_indices = unpadded_seq_lengths - self.next_k  # 形状为 (batch_size,)。
+ 
+-        # for each row, we select [label_start_indices, label_start_indices + 1, ..., label_start_indices + next_k - 1]
+-        label_col_offset = torch.arange(self.next_k)  # shape: (next_k,)
++        # 对每一行选择 [label_start_indices, ..., label_start_indices + next_k - 1]。
++        label_col_offset = torch.arange(self.next_k)  # 形状为 (next_k,)。
+         label_col_indices = (
+             label_start_indices.unsqueeze(1) + label_col_offset
+-        )  # shape: (batch_size, next_k)
++        )  # 形状为 (batch_size, next_k)。
+         label_col_indices = label_col_indices.reshape(
+             -1
+-        )  # shape: (batch_size * next_k,)
++        )  # 形状为 (batch_size * next_k,)。
+ 
+-        # To get the row indices, we repeat each row index next_k times
+-        row_orig_indices = torch.arange(sequence.size(0))  # shape: (batch_size,)
++        # 为了取出对应行，需将每个行索引重复 next_k 次。
++        row_orig_indices = torch.arange(sequence.size(0))  # 形状为 (batch_size,)。
+         row_interleaved_indices = row_orig_indices.repeat_interleave(
+             self.next_k
+-        )  # shape: (batch_size * next_k,)
++        )  # 形状为 (batch_size * next_k,)。
+ 
+         labels = sequence[row_interleaved_indices, label_col_indices]
+ 
+-        # for prediction, for each row, we replace the last next_k tokens with
+-        # 1 masking token at the label_start_indices, and next_k - 1 with padding tokens
++        # 构造预测输入时，每一行把最后 next_k 个 token 替换掉：
++        # label_start_indices 位置放 1 个 masking token，其余 next_k - 1 个位置放 padding token。
+         sequence[row_interleaved_indices, label_col_indices] = padding_token
+         sequence[row_orig_indices, label_start_indices] = masking_token
+ 
+-        # for each row, we use the label_start_index (which was masked) as label prediction for all the next_k labels
++        # 每一行都使用被 mask 的 label_start_index 位置来预测对应的 next_k 个 label。
+         label_location = torch.stack(
+             (
+                 row_interleaved_indices,
+diff --git a/src/data/loading/components/pre_processing.py b/src/data/loading/components/pre_processing.py
+index 721ecb8..5240310 100755
+--- a/src/data/loading/components/pre_processing.py
++++ b/src/data/loading/components/pre_processing.py
+@@ -12,7 +12,7 @@ from src.data.loading.components.interfaces import (
+ from src.data.loading.components.interfaces import TokenizerConfig
+ from src.utils.utils import load_tokenize
+ 
+-# support functions
++# 辅助函数。
+ 
+ def convert_bytes_to_string(
+     batch_or_row: Dict[str, np.ndarray],
+@@ -20,10 +20,22 @@ def convert_bytes_to_string(
+     features_to_apply: Optional[List[str]] = [],
+     **kwargs,
+ ) -> Dict[str, np.ndarray]:
+-    # For each feature to apply, cast its np.ndarray of bytes to string.
++    # TFRecord text fields are UTF-8 bytes. NumPy's ``astype(str)`` assumes
++    # ASCII and fails for multilingual titles or emoji.
+     for k in batch_or_row:
+         if is_feature_in_features_to_apply(features_to_apply, k):
+-            batch_or_row[k] = batch_or_row[k].astype(str)
++            value = batch_or_row[k]
++            if isinstance(value, np.ndarray):
++                batch_or_row[k] = np.vectorize(
++                    lambda text: text.decode("utf-8")
++                    if isinstance(text, (bytes, bytearray))
++                    else str(text),
++                    otypes=[str],
++                )(value)
++            elif isinstance(value, (bytes, bytearray)):
++                batch_or_row[k] = value.decode("utf-8")
++            else:
++                batch_or_row[k] = str(value)
+     return batch_or_row
+ 
+ def is_feature_in_features_to_apply(features_to_apply: List[str], k: str) -> bool:
+@@ -47,9 +59,9 @@ def filter_features_to_consider(
+         if dataset_config.item_id_field not in features_to_consider:
+             features_to_consider.add(dataset_config.item_id_field)
+     if len(dataset_config.features_to_consider):
+-        # Given a batch or row, filter the features to consider.
++        # 对单行或 batch，仅保留需要参与后续处理的特征。
+         return {k: v for k, v in batch_or_row.items() if k in features_to_consider}
+-    # if not specified, we consider all features
++    # 未显式指定时，默认保留所有特征。
+     return batch_or_row
+ 
+ 
+@@ -59,7 +71,7 @@ def convert_to_dense_numpy_array(
+     features_to_apply: Optional[List[str]] = [],
+     **kwargs,
+ ) -> Dict[str, np.ndarray]:
+-    # Transform a tfrecord example to a dictionary of numpy arrays, converting sparse tensors to dense numpy arrays.
++    # 将 tfrecord 样本转为 numpy 数组字典，并把 sparse tensor 转为 dense numpy 数组。
+ 
+     for k in batch_or_row:
+         if is_feature_in_features_to_apply(features_to_apply, k):
+@@ -73,7 +85,7 @@ def map_feature_names(
+     features_to_apply: Optional[List[str]] = [],
+     **kwargs,
+ ) -> Dict[str, np.ndarray]:
+-    # Given a batch or row, map the feature names to the desired feature names.
++    # 对单行或 batch，将原始特征名映射为目标特征名。
+     if dataset_config.feature_map:
+         batch_or_row = {
+             v: batch_or_row[k]
+@@ -89,8 +101,8 @@ def convert_fields_to_tensors(
+     features_to_apply: Optional[List[str]] = [],
+     **kwargs,
+ ) -> Dict[str, torch.Tensor]:
+-    # Given a batch or row, convert all fields to torch tensors. Uses the field type map to determine the dtype, defaulting to torch.long
+-    # if no dtype is specified.
++    # 对单行或 batch，将所有字段转为 torch tensor。
++    # dtype 由 field_type_map 决定；未指定时默认使用 torch.long。
+     for k, v in batch_or_row.items():
+         if is_feature_in_features_to_apply(features_to_apply, k):
+             if isinstance(v, int) or isinstance(v, float):
+@@ -100,8 +112,8 @@ def convert_fields_to_tensors(
+ 
+ 
+ def filter_sequence_length_row(row: Dict[str, torch.Tensor], dataset_config: BaseDatasetConfig, features_to_apply: Optional[List[str]] = [], **kwargs) -> Dict[str, np.ndarray]:  # type: ignore
+-    # Only works for a row right now. This filters out rows that have fields with sequence length smaller than the min threshold.
+-    # TODO(lneves): Make this work for a batch as well without creating batches of different sizes.
++    # 目前只支持单行输入：过滤掉任意字段序列长度小于最小阈值的行。
++    # TODO（lneves）：在不生成不同大小 batch 的前提下支持 batch 输入。
+     for _, tensor in row.items():
+         if len(tensor) < dataset_config.min_sequence_length:
+             return None
+@@ -109,7 +121,7 @@ def filter_sequence_length_row(row: Dict[str, torch.Tensor], dataset_config: Bas
+ 
+ 
+ def filter_empty_feature(row: Dict[str, torch.Tensor], dataset_config: BaseDatasetConfig, features_to_apply: Optional[List[str]] = [], **kwargs) -> Dict[str, np.ndarray]:  # type: ignore
+-    # Only works for a row right now. This filters out rows that have fields with empty tensors.
++    # 目前只支持单行输入：过滤掉包含空 tensor 字段的行。
+     for k, v in row.items():
+         if is_feature_in_features_to_apply(features_to_apply, k):
+             if len(v) == 0:
+@@ -132,11 +144,11 @@ def map_sparse_id_to_semantic_id(
+     for k, v in row.items():
+         if is_feature_in_features_to_apply(features_to_apply, k):
+             id_map: torch.Tensor = dataset_config.semantic_id_map.get(k, None)
+-            # id_map is a D x N tensor
+-            # where N is the number of unique items in the dataset
+-            # and D is the number of hierarchies (semantic id digits)
++            # id_map 是 D x N 张量：
++            # N 表示数据集中唯一 item 数量，
++            # D 表示层级数，也就是 semantic id 的位数。
+             if id_map is not None:
+-                # flatten the semantic id sequence
++                # 将 semantic id 序列展平为一维序列。
+                 if num_hierarchies is None:
+                     row[k] = id_map.t()[v].view(-1)
+                 else:
+@@ -199,8 +211,8 @@ def tokenize_text_features(
+     tokenizer_config: Optional[TokenizerConfig] = None,
+     **kwargs,
+ ) -> Dict[str, Any]:
+-    # Tokenize text features. features_to_apply must contain only text features.
+-    # This works for both rows and batches.
++    # 对文本特征做 tokenization；features_to_apply 中应只包含文本特征。
++    # 单行和 batch 都支持。
+     tokenize = load_tokenize(config=tokenizer_config)
+     batch_or_row_masks = {}
+     for k, v in batch_or_row.items():
+@@ -210,18 +222,18 @@ def tokenize_text_features(
+                 tokenized_seq_list = [tokenize(s) for s in v]
+                 batch_or_row[k] = torch.stack(
+                     [seq["input_ids"].flatten() for seq in tokenized_seq_list]
+-                )  # seq_length x token_seq_length x 1
++                )  # 形状为 seq_length x token_seq_length x 1。
+                 batch_or_row_masks[k_mask] = torch.stack(
+                     [seq["attention_mask"].flatten() for seq in tokenized_seq_list]
+-                )  # seq_length x token_seq_length x 1
++                )  # 形状为 seq_length x token_seq_length x 1。
+             else:
+                 tokenized_seq = tokenize(v)
+                 batch_or_row[k] = tokenized_seq[
+                     "input_ids"
+-                ].flatten()  # token_seq_length
++                ].flatten()  # 形状为 token_seq_length。
+                 batch_or_row_masks[k_mask] = tokenized_seq[
+                     "attention_mask"
+-                ].flatten()  # token_seq_length
++                ].flatten()  # 形状为 token_seq_length。
+ 
+     batch_or_row.update(batch_or_row_masks)
+     return batch_or_row
+@@ -233,30 +245,30 @@ def preprocess_categorical_feature_to_idx(
+     mapping_file: Optional[str] = "",
+     **kwargs,
+ ) -> Dict[str, Any]:
+-    # Translate categorical features to indices by looking at the mapping provided.
+-    # features_to_apply must contain name of the categorical features whose mapping is available in the mapping_file.
+-    # This works for both rows and batches.
++    # 根据提供的映射表将类别特征转换为索引。
++    # features_to_apply 必须只包含 mapping_file 中可查到映射的类别特征名。
++    # 单行和 batch 都支持。
+ 
+-    # Load the mapping if a mapping file is provided
++    # 如果提供了映射文件，则加载映射表。
+     if mapping_file:
+         category_to_idx = load_json(mapping_file)
+     else:
+         raise ValueError("A valid path to the mapping file must be provided.")
+ 
+-    # Helper function to translate feature values to index
++    # 将单个特征值或特征值列表转换为索引。
+     def translate_to_index(value: Union[str, List[str]]) -> Union[int, List[int]]:
+         if isinstance(value, list):
+             return [
+                 category_to_idx.get(v, 0) for v in value
+-            ]  # Translate each element in the list
++            ]  # 转换列表中的每个元素。
+         else:
+             return category_to_idx.get(
+                 value, 0
+-            )  # Default to 0 (e.g., '<OOV>') if not found
++            )  # 找不到时默认返回 0，例如 '<OOV>'。
+ 
+-    # Determine if we are handling a single row or a batch of rows
++    # 判断当前处理的是单行还是多行 batch。
+     is_batch = isinstance(batch_or_row, list)
+-    # Apply the mapping to the appropriate features
++    # 对目标特征应用映射。
+     if is_batch:
+         for row in batch_or_row:
+             for feature in features_to_apply:
+@@ -265,7 +277,7 @@ def preprocess_categorical_feature_to_idx(
+     else:
+         for feature in features_to_apply:
+             if feature in batch_or_row:
+-                # if it's a sequence feature then process the entire sequence
++                # 如果是序列特征，则处理完整序列。
+                 batch_or_row[feature] = translate_to_index(batch_or_row[feature])
+     return batch_or_row
+ 
+@@ -279,14 +291,14 @@ def map_sparse_id_to_embedding(
+     embedding_field_to_add: str = "embedding",
+     **kwargs,
+ ) -> Dict[str, Any]:
+-    # Map sparse id to pre-computed embedding
++    # 将 sparse id 映射到预先计算好的 embedding。
+ 
+     embedding_map: torch.Tensor = dataset_config.embedding_map.get(
+         sparse_id_field, None
+     )
+-    # embedding_map is an N x d tensor
+-    # where N is the number of unique items in the dataset
+-    # and d is the dimension of the embedding
++    # embedding_map 是 N x d 张量：
++    # N 表示数据集中唯一 item 数量，
++    # d 表示 embedding 维度。
+     if embedding_map is not None:
+         row[embedding_field_to_add] = embedding_map[row[sparse_id_field]].squeeze()
+     else:
+@@ -299,8 +311,8 @@ def squeeze_tensor_in_place(
+     features_to_apply: Optional[List[str]] = [],
+     **kwargs,
+ ) -> Dict[str, Any]:
+-    # Squeeze the dimensions of the features to apply
+-    # This squeeze is done in place, it does not create a new tensor
++    # 对目标特征执行 squeeze。
++    # 这里使用原地 squeeze，不创建新 tensor。
+     for k, v in batch_or_row.items():
+         if is_feature_in_features_to_apply(features_to_apply, k):
+             if isinstance(v, torch.Tensor):
+diff --git a/src/data/loading/datamodules/sequence_datamodule.py b/src/data/loading/datamodules/sequence_datamodule.py
+index b9141c2..620836d 100755
+--- a/src/data/loading/datamodules/sequence_datamodule.py
++++ b/src/data/loading/datamodules/sequence_datamodule.py
+@@ -43,8 +43,7 @@ class SequenceDataModule(LightningDataModule):
+         """
+         super().__init__()
+ 
+-        # this line allows to access init params with 'self.hparams' attribute
+-        # also ensures init params will be stored in ckpt
++        # 让初始化参数可通过 `self.hparams` 访问，并确保它们会写入 ckpt。
+         self.save_hyperparameters(logger=False)
+ 
+         self.stage_to_config = {
+@@ -63,8 +62,8 @@ class SequenceDataModule(LightningDataModule):
+ 
+         :param config: The dataloader configuration.
+         """
+-        # We need to set the collate function here because we can't pickle
+-        # lambda functions but the collate fn needs to receive just the batch.
++        # 这里用 partial 固定 collate 参数，因为 lambda 无法被 pickle，
++        # 而 DataLoader 调用 collate_fn 时只能传入 batch。
+ 
+         partial_collate_fn = partial(
+             dataloader_config.collate_fn,
+@@ -87,7 +86,7 @@ class SequenceDataModule(LightningDataModule):
+         """Assign data files to GPUs.
+ 
+         Note that `self.trainer.world_size` is the total number of GPUs, and is
+-        equal to (# nodes) x (# GPUs per node).
++        等于（节点数）x（每个节点的 GPU 数）。
+         This method is called by Lightning before `trainer.fit()`,
+         `trainer.validate()`, `trainer.test()`, and `trainer.predict()`, so be
+         careful not to execute things like random split twice! Also, it is
+@@ -109,10 +108,10 @@ class SequenceDataModule(LightningDataModule):
+         for stage, config in self.stage_to_config.items():
+             if (
+                 config is None
+-            ):  # config is None when we don't want to set up the stages. ie. For inference, we only initialize the predict stage.
++            ):  # config 为 None 表示无需初始化该阶段；例如推理时通常只初始化 predict 阶段。
+                 self.stage_to_file_map[stage] = {}
+             else:
+-                # If the stage has not been initialized yet, we assign files to workers based on the suffix passed by the config.
++                # 如果该阶段尚未初始化，则按配置中的后缀收集文件并分配给 worker。
+                 if stage not in self.stage_to_file_map:
+                     list_of_files = list_files(
+                         folder_path=config.data_folder,
+@@ -162,7 +161,7 @@ class SequenceDataModule(LightningDataModule):
+             else False
+         )
+ 
+-        # We initialize the dataset with the parameters passed on the config.
++        # 使用配置中的参数初始化 dataset。
+         dataset = curr_config.dataset_class(
+             dataset_config=curr_config.dataset_config,
+             data_folder=curr_config.data_folder,
+@@ -177,15 +176,14 @@ class SequenceDataModule(LightningDataModule):
+         )
+ 
+         dataset.set_list_of_files(list_of_files=device_file_list)
+-        # set the number of total GPUs and GPU index
++        # 设置总 GPU 数和当前 GPU 对应的全局 worker id。
+         dataset.set_distributed_params(
+             total_workers=self.trainer.world_size,
+             global_worker_id=self.trainer.global_rank,
+         )
+ 
+-        # Any additional parameters for the masking function should be added to
+-        # the config and passed there. This is required because we can't pickle
+-        # lambda functions but the collate fn needs to receive just the batch.
++        # masking 函数所需的额外参数应放入配置并在这里绑定。
++        # 这样可以避开 lambda 无法 pickle 的问题，同时保持 collate_fn 只接收 batch。
+         collate_fn_partial = self._get_partial_collate_fn(curr_config)
+ 
+         if curr_config.num_workers == 0:
+@@ -203,7 +201,7 @@ class SequenceDataModule(LightningDataModule):
+                 batch_size=curr_config.batch_size_per_device
+                 if curr_config.dataset_config.iterate_per_row
+                 else None,
+-                num_workers=curr_config.num_workers,  # num workers per GPU
++                num_workers=curr_config.num_workers,  # 每个 GPU 上的 worker 数。
+                 pin_memory=curr_config.pin_memory,
+                 persistent_workers=persistent_workers,
+                 drop_last=curr_config.drop_last
+@@ -337,7 +335,7 @@ class ItemDataModule(SequenceDataModule):
+             stage == TrainerFn.FITTING or not assign_all_files_per_worker
+         ), "Automatic file assignment should only be disabled for training."
+ 
+-        # We initialize the dataset with the parameters passed on the config.
++        # 使用配置中的参数初始化 dataset。
+         dataset = curr_config.dataset_class(
+             dataset_config=curr_config.dataset_config,
+             data_folder=curr_config.data_folder,
+@@ -352,7 +350,7 @@ class ItemDataModule(SequenceDataModule):
+         )
+ 
+         dataset.set_list_of_files(list_of_files=device_file_list)
+-        # set the number of total GPUs and GPU index
++        # 设置总 GPU 数和当前 GPU 对应的全局 worker id。
+         dataset.set_distributed_params(
+             total_workers=self.trainer.world_size,
+             global_worker_id=self.trainer.global_rank,
+@@ -373,7 +371,7 @@ class ItemDataModule(SequenceDataModule):
+                 batch_size=curr_config.batch_size_per_device
+                 if curr_config.dataset_config.iterate_per_row
+                 else None,
+-                num_workers=curr_config.num_workers,  # num workers per GPU
++                num_workers=curr_config.num_workers,  # 每个 GPU 上的 worker 数。
+                 pin_memory=curr_config.pin_memory,
+                 persistent_workers=persistent_workers,
+                 drop_last=curr_config.drop_last
+diff --git a/src/data/loading/utils.py b/src/data/loading/utils.py
+index 412bb80..c4a1a35 100755
+--- a/src/data/loading/utils.py
++++ b/src/data/loading/utils.py
+@@ -49,13 +49,13 @@ def assign_files_to_workers(
+     if total_workers == 0:
+         return {0: list_of_files}, True
+ 
+-    # If more workers than files, then each worker gets all files, but reads
+-    # only a fraction of the rows
++    # 当 worker 数多于文件数时，每个 worker 都拿到全部文件，
++    # 但后续只读取其中一部分行，避免 worker 空闲。
+     if len(list_of_files) < total_workers or assign_all_files_per_worker:
+         return {worker: list_of_files.copy() for worker in range(total_workers)}, True
+ 
+     if not assign_by_size:
+-        # files are assigned randomly to workers
++        # 不按文件大小均衡时，随机或顺序地把文件切分给各个 worker。
+         list_of_files = list_of_files.copy()
+         if should_shuffle_rows:
+             random.shuffle(list_of_files)
+@@ -65,7 +65,7 @@ def assign_files_to_workers(
+         }
+         return worker_to_files, False
+ 
+-    # Otherwise, assign files to workers balancing by file size
++    # 否则根据文件大小做均衡分配，尽量让每个 worker 的总数据量接近。
+     list_of_files_and_sizes = [(file, get_file_size(file)) for file in list_of_files]
+     list_of_files_and_sizes.sort(key=lambda x: x[1], reverse=True)
+ 
+@@ -73,10 +73,10 @@ def assign_files_to_workers(
+     worker_loads = [(0, worker_id) for worker_id in range(total_workers)]
+ 
+     for file, file_size in list_of_files_and_sizes:
+-        # assign file to the worker with smallest storage usage
++        # 将当前文件分配给累计数据量最小的 worker。
+         worker_load, min_worker_load_index = heapq.heappop(worker_loads)
+         worker_to_files[min_worker_load_index].append(file)
+-        # update worker's total storage usage
++        # 更新该 worker 的累计数据量。
+         heapq.heappush(worker_loads, (worker_load + file_size, min_worker_load_index))
+ 
+     return worker_to_files, False
+@@ -87,24 +87,24 @@ def pad_or_trim_sequence(
+ ) -> torch.Tensor:
+     """Pad or trim the input sequence to the desired length."""
+ 
+-    # truncation
++    # 截断过长序列。
+     if padded_sequence.size(1) > sequence_length:
+-        # TODO (clark): if padded_sequence contains a lot of sequences sharing the same post-fix,
+-        # this current solution will create duplicate sequences.
++        # TODO（clark）：如果 padded_sequence 中很多序列共享相同后缀，
++        # 当前做法会生成重复序列。
+         bs, seq = padded_sequence.shape
+         arange0 = torch.arange(seq, device=padded_sequence.device).repeat((bs, 1))
+         mask = padded_sequence == padding_token
+-        # gets the len before padding
++        # 获取 padding 之前的真实长度。
+         lengths = seq - mask.sum(1)
+-        # shifts only for sequences longer than max_len
++        # 只对长度超过 max_len 的序列计算偏移量。
+         shift = torch.clamp(lengths - sequence_length, min=0).unsqueeze(1)
+-        # rotate the indexes so we can trim just the last ones
++        # 旋转索引，使截断时保留序列末尾的有效 token。
+         final_idx = (arange0 + shift) % seq
+         rotated = torch.gather(padded_sequence, 1, final_idx)
+-        # get just the max len
++        # 只保留目标最大长度。
+         padded_sequence = rotated[:, :sequence_length]
+ 
+-    # additional padding
++    # 对短序列补齐到目标长度。
+     if padded_sequence.size(1) < sequence_length:
+         padding_tensor = (
+             padding_token
+diff --git a/src/inference.py b/src/inference.py
+index 359b37b..344c39b 100755
+--- a/src/inference.py
++++ b/src/inference.py
+@@ -42,10 +42,10 @@ def main(cfg: DictConfig) -> None:
+ 
+     :param cfg: DictConfig configuration composed by Hydra.
+     """
+-    # apply extra utilities
++    # 应用额外工具逻辑。
+     extras(cfg)
+ 
+-    # run inference
++    # 执行推理。
+     inference(cfg)
+ 
+ 
+diff --git a/src/models/components/network_blocks/aggregation_strategy.py b/src/models/components/network_blocks/aggregation_strategy.py
+index 12337c6..4adcb43 100755
+--- a/src/models/components/network_blocks/aggregation_strategy.py
++++ b/src/models/components/network_blocks/aggregation_strategy.py
+@@ -52,27 +52,27 @@ class MeanAggregation(AggregationStrategy):
+         Returns:
+             torch.Tensor: The aggregated embeddings of shape (return_size, embedding_dim).
+         """
+-        # Select the embeddings for the specified row ids
++        # 选出指定 row_ids 对应的 embeddings。
+         embeddings = embeddings[
+             row_ids
+-        ]  # Shape (return_size, sequence_length, embedding_dim)
+-        # Create a mask to select the last K items of sequences
++        ]  # 形状为 (return_size, sequence_length, embedding_dim)。
++        # 创建 mask，用于选择每条序列最后 K 个 item。
+         mask = create_last_k_mask(embeddings.size(1), last_item_index, self.last_k)
+         mask = mask.to(dtype=embeddings.dtype, device=embeddings.device)
+ 
+-        # Apply the mask to the embeddings
++        # 将 mask 应用到 embeddings 上。
+         masked_embeddings = embeddings * mask.unsqueeze(
+             2
+-        )  # Shape (return_size, sequence_length, embedding_dim)
++        )  # 形状为 (return_size, sequence_length, embedding_dim)。
+ 
+-        # Sum the masked embeddings and divide by the count of non-zero elements in the mask
++        # 对 mask 后的 embeddings 求和，再除以 mask 中非零元素数量。
+         sum_embeddings = torch.sum(
+             masked_embeddings, dim=1
+-        )  # Shape (return_size, embedding_dim)
++        )  # 形状为 (return_size, embedding_dim)。
+         count = (
+             torch.sum(mask, dim=1).clamp(min=1).unsqueeze(1)
+-        )  # Shape (return_size, embedding_dim)
+-        return sum_embeddings / count  # Shape (return_size, embedding_dim)
++        )  # 形状为 (return_size, embedding_dim)。
++        return sum_embeddings / count  # 形状为 (return_size, embedding_dim)。
+ 
+ 
+ class LastAggregation(AggregationStrategy):
+@@ -92,6 +92,6 @@ class FirstAggregation(AggregationStrategy):
+         row_ids: torch.Tensor,
+         last_item_index: torch.Tensor,
+     ) -> torch.Tensor:
+-        # Return the first item in each sequence, assuming sequences are right-padded
+-        # TODO(liam): allow all aggregation strategies to handle left padding
++        # 返回每条序列中的第一个 item；这里假设序列采用右侧 padding。
++        # TODO（liam）：让所有聚合策略都能处理左侧 padding。
+         return embeddings[row_ids, 0]
+diff --git a/src/models/components/network_blocks/embedding_aggregator.py b/src/models/components/network_blocks/embedding_aggregator.py
+index 794fd0d..e23a2e0 100755
+--- a/src/models/components/network_blocks/embedding_aggregator.py
++++ b/src/models/components/network_blocks/embedding_aggregator.py
+@@ -27,24 +27,24 @@ class EmbeddingAggregator(nn.Module):
+         embeddings: torch.Tensor,
+         attention_mask: torch.Tensor,
+     ) -> torch.Tensor:
+-        # embeddings: (batch_size, sequence_length, embedding_dim)
+-        # attention_mask: (batch_size, sequence_length)
++        # embeddings 形状为 (batch_size, sequence_length, embedding_dim)。
++        # attention_mask 形状为 (batch_size, sequence_length)。
+ 
+-        # we -1 here because the token index starts from 0
++        # token 索引从 0 开始，因此真实长度需要减 1 才是最后一个 item 的索引。
+         last_item_index = attention_mask.sum(dim=1) - 1
+ 
+-        # The following 3 steps are equivalent to
++        # 下面 3 步等价于：
+         # row_ids = torch.arange(embeddings.size(0))
+-        # but in a way that is traceable with Fx.
++        # 但这种写法可以被 Fx trace。
+ 
+-        # 1. Create a dummy tensor with the same batch shape as attention_mask
+-        dummy_tensor_for_batch_shape = attention_mask[:, 0]  # Shape (batch_size,)
++        # 1. 创建一个与 attention_mask batch 维一致的占位 tensor。
++        dummy_tensor_for_batch_shape = attention_mask[:, 0]  # 形状为 (batch_size,)。
+ 
+-        # 2. Use torch.ones_like to create a tensor of ones with that shape.
+-        # Note that torch.ones is not traceable in Fx, so we use torch.ones_like.
++        # 2. 使用 torch.ones_like 创建同形状的全 1 tensor。
++        # torch.ones 不能被 Fx trace，因此这里使用 torch.ones_like。
+         ones_tensor = torch.ones_like(dummy_tensor_for_batch_shape, dtype=torch.long)
+ 
+-        # 3. Use cumsum to get the 0 to batch_size - 1 sequence
++        # 3. 使用 cumsum 得到 0 到 batch_size - 1 的序列。
+         row_ids = torch.cumsum(ones_tensor, dim=0) - 1
+ 
+         return self.aggregation_strategy.aggregate(embeddings, row_ids, last_item_index)
+diff --git a/src/models/modules/base_module.py b/src/models/modules/base_module.py
+index 3745f31..74e1a37 100755
+--- a/src/models/modules/base_module.py
++++ b/src/models/modules/base_module.py
+@@ -39,18 +39,18 @@ class BaseModule(LightningModule):
+         self.loss_function = loss_function
+         self.evaluator = evaluator
+         self.training_loop_function = training_loop_function
+-        # We use setters to set the prediction key and name.
++        # 使用 setter 设置 prediction key 和 name，便于记录调试日志。
+         self._prediction_key_name = None
+         self._prediction_name = None
+ 
+         if self.training_loop_function is not None:
+             self.automatic_optimization = False
+ 
+-        if self.evaluator:  # For inference, evaluator is not set.
++        if self.evaluator:  # 推理阶段不会设置 evaluator。
+             for metric_name, metric_object in self.evaluator.metrics.items():
+                 setattr(self, metric_name, metric_object)
+ 
+-            # for averaging loss across batches
++            # 用于跨 batch 平均 loss。
+             self.train_loss = MeanMetric()
+             self.val_loss = MeanMetric()
+             self.test_loss = MeanMetric()
+@@ -92,8 +92,8 @@ class BaseModule(LightningModule):
+ 
+     def on_train_start(self) -> None:
+         """Lightning hook that is called when training begins."""
+-        # by default lightning executes validation step sanity checks before training starts,
+-        # so it's worth to make sure validation metrics don't store results from these checks
++        # Lightning 默认会在训练开始前执行 validation sanity check，
++        # 因此这里重置验证指标，避免 sanity check 的结果混入正式训练指标。
+         self.val_loss.reset()
+         self.evaluator.reset()
+         self.train_loss.reset()
+@@ -120,7 +120,7 @@ class BaseModule(LightningModule):
+         self.log_metrics("test")
+ 
+     def on_exception(self, exception):
+-        self.trainer.should_stop = True  # stop all workers
++        self.trainer.should_stop = True  # 停止所有 worker。
+         self.trainer.logger.finalize(status="failure")
+ 
+     def log_metrics(
+@@ -128,8 +128,8 @@ class BaseModule(LightningModule):
+         prefix: str,
+         on_step=False,
+         on_epoch=True,
+-        # We use sync_dist=False by default because, if using retrieval metrics, those are already synchronized. Change if using
+-        # different metrics than the default ones.
++        # 默认使用 sync_dist=False，因为 retrieval metrics 内部已经同步。
++        # 如果换成其它指标，需要按实际情况调整。
+         sync_dist=False,
+         logger=True,
+         prog_bar=False,
+diff --git a/src/models/modules/clustering/base_clustering_module.py b/src/models/modules/clustering/base_clustering_module.py
+index b7ce99d..0744be1 100644
+--- a/src/models/modules/clustering/base_clustering_module.py
++++ b/src/models/modules/clustering/base_clustering_module.py
+@@ -118,8 +118,7 @@ class BaseClusteringModule(LightningModule):
+                 self.centroids.data, dtype=batch.dtype, device=self.device
+             )
+             loss = self.init_loss_function(self.centroids, centroid_zero_embeddings)
+-            # The centroids at the start of this step are 0, so we return dummy embeddings
+-            # and assignments
++            # 此阶段开始时 centroids 仍为 0，因此返回占位 embeddings 和 assignments。
+             batch_zero_embeddings = torch.zeros_like(
+                 batch, dtype=batch.dtype, device=self.device
+             )
+@@ -131,15 +130,13 @@ class BaseClusteringModule(LightningModule):
+             self.init_centroids = torch.zeros_like(
+                 self.centroids.data, dtype=batch.dtype, device=self.device
+             )
+-            # This function is rank zero only, so only the buffer from the first device
+-            # is used to initialize the centroids
++            # 该函数只在 rank 0 执行，因此只使用第一个设备上的 buffer 初始化中心。
+             self.compute_initial_centroids(self.init_buffer)
+             self.is_initial_step = True
+             self.init_buffer = torch.tensor([], device=self.device)
+ 
+             if self.update_manually:
+-                # If we are updating manually, we set the centroids to the initial
+-                # centroids without gradients
++                # 手动更新时，直接无梯度地把 centroids 设置为初始化结果。
+                 self.centroids[:] = self.init_centroids.data
+                 distances = self.distance_function.compute(batch, self.centroids.data)
+                 assignments = torch.argmin(distances, dim=1).to(self.device)
+diff --git a/src/models/modules/clustering/mini_batch_kmeans.py b/src/models/modules/clustering/mini_batch_kmeans.py
+index f420386..e515812 100644
+--- a/src/models/modules/clustering/mini_batch_kmeans.py
++++ b/src/models/modules/clustering/mini_batch_kmeans.py
+@@ -71,17 +71,16 @@ class MiniBatchKMeans(BaseClusteringModule):
+             batch_cluster_counts: Number of points in each cluster of shape (n_clusters,)
+             batch_cluster_sums: Sum of points in each cluster of shape (n_clusters, n_features)
+         """
+-        # Compute cluster assignments
+-        # Note that assignments is automatically detached from the computation graph
+-        # because it results from argmin
++        # 计算聚类分配。
++        # assignments 来自 argmin，因此会自动脱离计算图。
+         assignments = self.predict_step(batch, return_embeddings=False)
+         assignments_one_hot = (
+             nn.functional.one_hot(assignments, self.n_clusters)
+         ).detach()
+-        # Count points in each cluster
++        # 统计每个 cluster 中的样本数。
+         batch_cluster_counts = torch.sum(assignments_one_hot, dim=0)
+         self.cluster_counts += batch_cluster_counts
+-        # Accumulate points for each cluster
++        # 累加每个 cluster 中的样本向量。
+         batch_cluster_sums = torch.mm(assignments_one_hot.float().t(), batch)
+ 
+         return assignments, batch_cluster_counts, batch_cluster_sums
+@@ -111,8 +110,7 @@ class MiniBatchKMeans(BaseClusteringModule):
+         """
+         batch = batch.to(self.device)
+ 
+-        # Initialize centroids using the chosen method
+-        # Buffer initial batches for better initialization
++        # 使用指定方法初始化中心；先缓存若干初始 batch，让初始化更稳定。
+         if self.is_initial_step:
+             self.is_initial_step = False
+             self.is_initialized = True
+@@ -122,7 +120,7 @@ class MiniBatchKMeans(BaseClusteringModule):
+         assignments, batch_cluster_counts, batch_cluster_sums = self.forward(batch)
+ 
+         centroids = self.get_centroids()
+-        # Use a mask to avoid division by zero
++        # 使用 mask 避免没有样本落入某个 cluster 时除零。
+         mask = batch_cluster_counts != 0
+         mask_target = batch_cluster_sums[mask] / batch_cluster_counts[mask].unsqueeze(1)
+         centroid_weights = batch_cluster_counts[mask] / self.cluster_counts[mask]
+@@ -133,8 +131,8 @@ class MiniBatchKMeans(BaseClusteringModule):
+             )
+             return assignments, centroids[assignments], None
+         else:
+-            # The MiniBatchKMeans algorithm update above is equivalent to an SGD step
+-            # with learning rate 0.5 on the loss function below
++            # 上面的 MiniBatchKMeans 手动更新等价于：
++            # 对下面的 loss 使用学习率为 0.5 的 SGD 执行一步。
+             loss = self.loss_function(centroids[mask], mask_target, centroid_weights)
+             return assignments, centroids[assignments], loss
+ 
+diff --git a/src/models/modules/huggingface/transformer_base_module.py b/src/models/modules/huggingface/transformer_base_module.py
+index 4b6baa2..3f75335 100755
+--- a/src/models/modules/huggingface/transformer_base_module.py
++++ b/src/models/modules/huggingface/transformer_base_module.py
+@@ -42,9 +42,8 @@ class TransformerBaseModule(BaseModule):
+             training_loop_function=training_loop_function,
+         )
+ 
+-        # this line allows to access init params with 'self.hparams' attribute
+-        # also ensures init params will be stored in ckpt
+-        # we remove the nn.Modules as they are already checkpointed to avoid doing it twice
++        # 让初始化参数可通过 `self.hparams` 访问，并确保它们会写入 ckpt。
++        # nn.Module 会被 checkpoint 自身保存，因此从 hparams 中排除，避免重复保存。
+ 
+         self.save_hyperparameters(
+             logger=False,
+@@ -82,20 +81,20 @@ class TransformerBaseModule(BaseModule):
+         :param batch_idx: The index of the current batch.
+         :return: A tensor of losses between model predictions and targets.
+         """
+-        # Lightning wraps it in a tuple for training, we get the batch from position 0.
+-        # this behavior only happens for training_step.
++        # Lightning 在 training_step 中会把 batch 包进 tuple，因此这里取第 0 个元素。
++        # 该行为只出现在 training_step。
+         batch = batch[0]
+-        # Batch is a tuple of model inputs and labels.
++        # batch 是模型输入和标签组成的 tuple。
+         model_input: SequentialModelInputData = batch[0]
+         label_data: SequentialModuleLabelData = batch[1]
+-        # Batch will be a tuple of model inputs and labels. We use the index here to access them.
++        # 通过索引访问模型输入和标签。
+         model_output, loss = self.model_step(
+             model_input=model_input, label_data=label_data
+         )
+ 
+-        # update and log metrics. Will only be logged at the interval specified in the logger config
++        # 更新并记录指标；实际写日志频率由 logger 配置决定。
+         self.train_loss(loss)
+-        # checks logging interval and logs the loss
++        # 按日志间隔记录 loss。
+         self.log(
+             "train/loss",
+             self.train_loss,
+@@ -106,8 +105,8 @@ class TransformerBaseModule(BaseModule):
+             sync_dist=True,
+         )
+ 
+-        # If a training loop function is passed, we call it with the module and the loss.
+-        # otherwise we use the automatic optimization provided by lightning
++        # 如果传入自定义 training_loop_function，则用它执行优化；
++        # 否则使用 Lightning 的自动优化。
+         if self.training_loop_function is not None:
+             self.training_loop_function(self, loss)
+ 
+@@ -121,7 +120,7 @@ class TransformerBaseModule(BaseModule):
+         """Perform a single evaluation step on a batch of data from the validation or test set.
+         The method will update the metrics and the loss that is passed.
+         """
+-        # Batch is a tuple of model inputs and labels.
++        # batch 是模型输入和标签组成的 tuple。
+         model_input: SequentialModelInputData = batch[0]
+         label_data: SequentialModuleLabelData = batch[1]
+ 
+@@ -133,13 +132,13 @@ class TransformerBaseModule(BaseModule):
+             model_output_before_aggregation, model_input.mask
+         )
+ 
+-        # Updates metrics inside evaluator.
++        # 在 evaluator 内部更新指标。
+         self.evaluator(
+             query_embeddings=model_output_after_aggregation,
+             key_embeddings=self.get_embedding_table().to(
+                 model_output_after_aggregation.device
+             ),
+-            # TODO: (lneves) hardcoded for now, will need to change for multiple features
++            # TODO（lneves）：目前是硬编码，后续需要支持多特征。
+             labels=list(label_data.labels.values())[0].to(
+                 model_output_after_aggregation.device
+             ),
+@@ -162,7 +161,7 @@ class TransformerBaseModule(BaseModule):
+         model_output_after_aggregation = self.aggregator(
+             model_output_before_aggregation, model_input.mask
+         )
+-        # TODO(lneves): Currently passing batch idx, change it to user_id and allow for the user to specify the key and prediction names.
++        # TODO（lneves）：当前传入 batch_idx，后续应改为 user_id，并允许用户指定 key 和 prediction 名称。
+         model_output = SharedKeyAcrossPredictionsOutput(
+             key=batch_idx,
+             predictions=model_output_after_aggregation,
+diff --git a/src/models/modules/semantic_id/tiger_generation_model.py b/src/models/modules/semantic_id/tiger_generation_model.py
+index ef8f83f..11b9552 100755
+--- a/src/models/modules/semantic_id/tiger_generation_model.py
++++ b/src/models/modules/semantic_id/tiger_generation_model.py
+@@ -185,15 +185,15 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+             torch.arange(num_hierarchies, device=input_sids.device) * codebook_size
+         )
+ 
+-        # Calculate how many times the full offset pattern needs to repeat
++        # 计算完整 offset 模式需要重复多少次。
+         num_repeats = (
+             num_cols + num_hierarchies - 1
+-        ) // num_hierarchies  # Integer division to handle cases where num_cols is not a multiple of num_hierarchies
++        ) // num_hierarchies  # 使用整数除法处理 num_cols 不是 num_hierarchies 倍数的情况。
+ 
+-        # Repeat the offsets and slice to match the number of columns
++        # 重复 offsets，并裁剪到与列数一致。
+         repeated_offsets = offsets.repeat(num_repeats)[:num_cols]
+ 
+-        # Add the repeated offsets to each row using broadcasting
++        # 使用 broadcasting 将重复后的 offsets 加到每一行。
+         input_sids_with_offsets = input_sids + repeated_offsets
+         if attention_mask is not None:
+             input_sids_with_offsets = input_sids_with_offsets * attention_mask
+@@ -212,42 +212,42 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+         Returns:
+             A boolean tensor of shape [batch_size] indicating the validity of each prefix.
+         """
+-        # TODO (clark): this is a temporary solution, we should use a more efficient way to do this
+-        # like pre-sorting the codebook and implementing a tree strcture
++        # TODO（clark）：这是临时方案，后续应采用更高效的实现，
++        # 例如预先排序 codebook 并实现树结构。
+ 
+         current_hierarchy = prefix.shape[1]
+         num_prefixes = prefix.shape[0]
+         results = []
+ 
+-        # Ensure codebooks are on the correct device.  Do this *once* outside the loop.
++        # 确保 codebooks 位于正确设备上；该操作只需在循环外执行一次。
+         if prefix.device != self.codebooks.device:
+             self.codebooks = self.codebooks.to(prefix.device)
+ 
+-        # Trim the codebooks to the relevant hierarchy *once* outside the loop.
++        # 在循环外一次性截取与当前 hierarchy 相关的 codebooks。
+         trimmed_codebooks = self.codebooks[:, :current_hierarchy]
+ 
+         for i in range(0, num_prefixes, batch_size):
+-            # Get the current batch of prefixes.
++            # 获取当前 batch 的 prefixes。
+             batch_prefix = prefix[
+                 i : i + batch_size
+-            ]  # Shape: [batch_size, hierarchy_level]
++            ]  # 形状为 [batch_size, hierarchy_level]。
+ 
+-            # Perform the comparison.  Broadcasting is now limited by batch_size.
+-            # trimmed_codebooks shape: [C, H] -> unsqueezed [C, 1, H]
+-            # batch_prefix shape   : [b, H] -> unsqueezed [1, b, H]
+-            # comparison result    : [C, b, H]
++            # 执行比较；broadcasting 范围被限制在当前 batch_size 内。
++            # trimmed_codebooks 形状：[C, H] -> unsqueeze 后 [C, 1, H]
++            # batch_prefix 形状：[b, H] -> unsqueeze 后 [1, b, H]
++            # comparison 结果形状：[C, b, H]
+             comparison = trimmed_codebooks.unsqueeze(1) == batch_prefix.unsqueeze(0)
+ 
+-            # Reduce along the hierarchy dimension (H). Shape: [C, b]
++            # 沿 hierarchy 维度 H 做归约，形状为 [C, b]。
+             all_match = comparison.all(dim=2)
+ 
+-            # Reduce along the codebook dimension (C).  Shape: [b]
++            # 沿 codebook 维度 C 做归约，形状为 [b]。
+             any_match = all_match.any(dim=0)
+ 
+-            # Append the results for this batch.
++            # 保存当前 batch 的结果。
+             results.append(any_match)
+ 
+-        # Concatenate the results from all batches.
++        # 拼接所有 batch 的结果。
+         return torch.cat(results)
+ 
+     def _beam_search_one_step(
+@@ -274,7 +274,7 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+             The updated generated IDs and the marginal probabilities.
+         """
+ 
+-        # pruning the beams that cannot be mapped to a valid item
++        # 剪掉无法映射到有效 item 的 beam。
+         if self.should_check_prefix:
+             if generated_ids is None:
+                 valid_prefix_mask = self._check_valid_prefix(
+@@ -285,7 +285,7 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+                 )
+                 candidate_logits[:, ~valid_prefix_mask] = float("-inf")
+             else:
+-                # we prune all beams with prefixes that cannot be mapped to a valid item
++                # 剪掉所有 prefix 无法映射到有效 item 的 beam。
+                 valid_prefix_mask = self._check_valid_prefix(
+                     torch.cat(
+                         [
+@@ -313,17 +313,17 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+                 indices[:, : self.top_k_for_generation],
+             )
+             generated_ids = indices_topk.unsqueeze(-1)
+-            # we need to overwrite the cache because we expanded the beam width from bsz to bsz * beam_width
+-            # real KV cache starts from the first hierarchy rather than 0-th
+-            # this is because in 0th hierarchy, self-attention doesn't have cache.
+-            # and kv cache in huggingface has poor support for this corner case
++            # beam 宽度从 bsz 扩展到 bsz * beam_width 后，需要重置 cache。
++            # 实际 KV cache 从第一个 hierarchy 开始，而不是第 0 个 hierarchy；
++            # 因为第 0 个 hierarchy 的 self-attention 没有 cache，
++            # HuggingFace 的 kv cache 对这个边界场景支持较弱。
+             past_key_values = EncoderDecoderCache(
+                 self_attention_cache=DynamicCache(),
+                 cross_attention_cache=DynamicCache(),
+             )
+             replace_indices = None
+         else:
+-            # we have beams, generating more beams from the existing beams
++            # 已经存在 beam 时，从现有 beam 继续扩展出更多候选。
+             proba, indices = (
+                 proba[:, : self.num_embeddings_per_hierarchy],
+                 indices[:, : self.num_embeddings_per_hierarchy],
+@@ -333,7 +333,7 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+             ), indices.reshape(
+                 -1, self.top_k_for_generation * self.num_embeddings_per_hierarchy
+             )
+-            # calculating the marginal probability
++            # 计算边际概率。
+             proba = torch.mul(
+                 marginal_log_prob.repeat_interleave(
+                     self.num_embeddings_per_hierarchy, dim=-1
+@@ -344,13 +344,13 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+                 torch.nan_to_num(proba, nan=-1), k=self.top_k_for_generation, dim=-1
+             )
+             proba_topk, indices_topk = topk_results.values, topk_results.indices
+-            # getting indices of winning beams in the original beams
++            # 取出获胜 beam 在原始 beam 中的索引。
+             replace_indices = (
+                 (indices_topk // self.num_embeddings_per_hierarchy)
+                 + torch.arange(indices_topk.size(0), device=proba.device).unsqueeze(1)
+                 * self.top_k_for_generation
+             ).flatten()
+-            # accordingly update kv cache given the winning beams
++            # 根据获胜 beam 同步更新 kv cache。
+             if past_key_values != None:
+                 past_key_values.reorder_cache(replace_indices)
+ 
+@@ -379,7 +379,7 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+         """Perform a single evaluation step on a batch of data from the validation or test set.
+         The method will update the metrics and the loss that is passed.
+         """
+-        # Batch is a tuple of model inputs and labels.
++        # batch 是模型输入和标签组成的 tuple。
+         model_input: SequentialModelInputData = batch[0]
+         label_data: SequentialModuleLabelData = batch[1]
+         _, loss = self.model_step(model_input=model_input, label_data=label_data)
+@@ -395,7 +395,7 @@ class SemanticIDGenerativeRecommender(TransformerBaseModule):
+         self.evaluator(
+             marginal_probs=marginal_probs,
+             generated_ids=generated_ids,
+-            # TODO: (lneves) hardcoded for now, will need to change for multiple features
++            # TODO（lneves）：目前是硬编码，后续需要支持多特征。
+             labels=list(label_data.labels.values())[0].to(marginal_probs.device),
+         )
+ 
+@@ -520,7 +520,7 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             encoder=self.encoder,
+         )
+ 
+-        # bos_token used to prompt the decoder to generate the first token
++        # bos_token 用于提示 decoder 生成第一个 token。
+         bos_token = torch.nn.Parameter(
+             torch.randn(1, self.embedding_dim), requires_grad=True
+         )
+@@ -541,8 +541,8 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+         )
+ 
+         if mlp_layers is not None:
+-            # bloating the mlp layers in both encoder and decoder
+-            # TODO (clark): this currently only works for T5
++            # 扩展 encoder 和 decoder 中的 MLP 层数。
++            # TODO（clark）：目前该逻辑只适用于 T5。
+             for name, module in self.named_modules():
+                 if isinstance(module, transformers.models.t5.modeling_t5.T5LayerFF):
+                     parent_module, attr_name = get_parent_module_and_attr(self, name)
+@@ -554,14 +554,14 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+                         ),
+                     )
+ 
+-        # generate embedding tables for each hierarchy
+-        # here we assume each hierarchy has the same amount of embeddings
++        # 为每个 hierarchy 生成 embedding table。
++        # 这里假设每个 hierarchy 的 embedding 数量相同。
+         self.item_sid_embedding_table_encoder = self._spawn_embedding_tables(
+             num_embeddings=self.num_embeddings_per_hierarchy * self.num_hierarchies,
+             embedding_dim=self.embedding_dim,
+         )
+ 
+-        # generating user embedding table
++        # 生成 user embedding table。
+         self.user_embedding: torch.nn.Embedding = (
+             self._spawn_embedding_tables(
+                 num_embeddings=num_user_bins,
+@@ -571,13 +571,13 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             else None
+         )
+ 
+-        # separation token for the encoder to differentiate between items
++        # encoder 使用 sep token 区分不同 item。
+         self.sep_token = (
+             torch.nn.Parameter(torch.randn(1, self.embedding_dim), requires_grad=True)
+             if should_add_sep_token
+             else None
+         )
+-        # the key value names for the prediction output
++        # 预测输出中的 key/value 名称。
+         self.prediction_key_name = prediction_key_name
+         self.prediction_value_name = prediction_value_name
+ 
+@@ -596,8 +596,8 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             user_id (torch.Tensor): The user IDs for the encoder.
+         """
+ 
+-        # we shift the IDs here to match the hierarchy structure
+-        # so that we can use a single embedding table to store the embeddigns for all hierarchies
++        # 这里对 ID 做偏移以匹配 hierarchy 结构，
++        # 这样就能用一张 embedding table 存储所有 hierarchy 的 embedding。
+         shifted_sids = self._add_repeating_offset_to_rows(
+             input_sids=input_ids,
+             codebook_size=self.num_embeddings_per_hierarchy,
+@@ -619,18 +619,17 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+                 num_hierarchies=self.num_hierarchies,
+             )
+ 
+-        # we enter this loop if we want to use user_id
++        # 如果需要使用 user_id，则进入该分支。
+         if user_id is not None and self.user_embedding is not None:
+-            # preprocessing function pad user_id with zeros
+-            # so we only need to take the first column
++            # 预处理函数会用 0 padding user_id，因此只需取第一列。
+             user_id = user_id[:, 0]
+ 
+-            # TODO (clark): here we assume remainder hashing, which is different from LSH hashing used in TIGER.
++            # TODO（clark）：这里假设使用取余 hash，和 TIGER 中的 LSH hash 不同。
+             user_embeds = self.user_embedding(
+                 torch.remainder(user_id, self.user_embedding.num_embeddings)
+             )
+ 
+-            # prepending the user_id embedding to the input senquence
++            # 将 user_id embedding 拼到输入序列最前面。
+             inputs_embeds_for_encoder = torch.cat(
+                 [
+                     user_embeds.unsqueeze(1),
+@@ -638,7 +637,7 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+                 ],
+                 dim=1,
+             )
+-            # prepending 1 to attention mask as we introduce user embedding in the first column
++            # 因为第一列新增了 user embedding，attention mask 也需要在开头补 1。
+             user_attention_mask = torch.ones(
+                 attention_mask.size(0), 1, device=attention_mask.device
+             )
+@@ -662,7 +661,7 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+         self,
+         attention_mask: Optional[
+             torch.Tensor
+-        ] = None,  # TODO (clark): in the future we should support variable length semantic id
++        ] = None,  # TODO（clark）：后续应支持可变长度 semantic id。
+         future_ids: Optional[torch.Tensor] = None,
+         encoder_output: Optional[torch.Tensor] = None,
+         attention_mask_for_encoder: Optional[torch.Tensor] = None,
+@@ -680,7 +679,7 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             past_key_values (Optional[DynamicCache]): The cache for past key values.
+         """
+ 
+-        # we generated something before and we need to shift the future_ids
++        # 已经生成过 token 时，需要对 future_ids 做 hierarchy 偏移。
+         if future_ids is not None:
+             shifted_future_sids = self._add_repeating_offset_to_rows(
+                 input_sids=future_ids,
+@@ -694,8 +693,7 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+                 shifted_future_sids
+             )
+ 
+-            # we do not have valid kv cache
+-            # we need to prepend bos token to the decoder input
++            # 没有有效 kv cache 时，需要在 decoder 输入前补 bos token。
+             if not self._is_kv_cache_valid(kv_cache=past_key_values):
+                 inputs_embeds_for_decoder = torch.cat(
+                     [
+@@ -715,10 +713,9 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+                         dim=1,
+                     )
+             else:
+-                # we have valid kv cache
+-                # we only need the last token in the decoder input
++                # kv cache 有效时，只需把最后一个 token 传给 decoder。
+                 inputs_embeds_for_decoder = inputs_embeds_for_decoder[:, -1:, :]
+-        # this is the beginning of generation, we start from bos token
++        # 生成刚开始时，从 bos token 开始。
+         else:
+             inputs_embeds_for_decoder = self.decoder.bos_token.unsqueeze(0).expand(
+                 encoder_output.size(0), 1, -1
+@@ -749,52 +746,49 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             user_id (torch.Tensor): The user IDs for the encoder.
+         """
+ 
+-        # getting encoder output
+-        # we only need to do this once because we have decoder
+-        # to do auto-regressive generation
++        # 获取 encoder 输出。
++        # decoder 会做自回归生成，因此 encoder 只需执行一次。
+         encoder_output, encoder_attention_mask = self.encoder_forward_pass(
+             attention_mask=attention_mask,
+             input_ids=input_ids,
+             user_id=user_id,
+         )
+ 
+-        # initilize cached generated ids to None
++        # 初始化缓存的 generated_ids。
+         generated_ids = None
+         marginal_log_prob = None
+ 
+-        # initialize kv cache
++        # 初始化 kv cache。
+         past_key_values = EncoderDecoderCache(
+             self_attention_cache=DynamicCache(), cross_attention_cache=DynamicCache()
+         )
+ 
+         for hierarchy in range(self.num_hierarchies):
+             if generated_ids is not None:
+-                # we generated something before
+-                # we need to reshape the generated ids so that
+-                # the number of beams equals to batch size * top_k
++                # 已经生成过 token，需要 reshape generated_ids，
++                # 使 beam 数量等于 batch_size * top_k。
+                 squeezed_generated_ids = generated_ids.reshape(-1, hierarchy).to(
+                     encoder_output.device
+-                )  # shape: (batch_size * top_k, hierarchy)
++                )  # 形状为 (batch_size * top_k, hierarchy)。
+ 
+                 repeated_encoder_output = encoder_output.repeat_interleave(
+                     self.top_k_for_generation, dim=0
+                 )
+-                # shape: (batch_size * top_k, seq_len+1, hidden_dim)
+-                # +1 because we have user_id token
++                # 形状为 (batch_size * top_k, seq_len + 1, hidden_dim)。
++                # +1 是因为包含 user_id token。
+ 
+                 repeated_encoder_attention_mask = (
+                     encoder_attention_mask.repeat_interleave(
+                         self.top_k_for_generation, dim=0
+                     )
+-                )  # shape: (batch_size * top_k, seq_len+1)
++                )  # 形状为 (batch_size * top_k, seq_len + 1)。
+             else:
+-                # we haven't generated anything yet!
+-                # the number of beams currently equals to batch size
++                # 尚未生成任何 token，此时 beam 数量等于 batch size。
+                 squeezed_generated_ids = None
+                 repeated_encoder_output = encoder_output
+                 repeated_encoder_attention_mask = encoder_attention_mask
+ 
+-            # feeding the decoder with the generated ids
++            # 将已生成的 ids 输入 decoder。
+             decoder_output, past_key_values = self.decoder_forward_pass(
+                 future_ids=squeezed_generated_ids,
+                 encoder_output=repeated_encoder_output,
+@@ -803,13 +797,13 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+                 past_key_values=past_key_values,
+             )
+ 
+-            # decoder_output[:, -1, :] is the embedding for the next token
++            # decoder_output[:, -1, :] 是用于预测下一个 token 的表示。
+             latest_output_representation = decoder_output[:, -1, :]
+ 
+-            # # calculating the logits for the next token
++            # 计算下一个 token 的 logits。
+             candidate_logits = self.decoder.decoder_mlp[hierarchy](
+                 latest_output_representation
+-            )  # shape: (batch_size * top_k, num_embeddings in the hierarchy)
++            )  # 形状为 (batch_size * top_k, 当前 hierarchy 的 embedding 数)。
+ 
+             (
+                 generated_ids,
+@@ -856,7 +850,7 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             attention_mask=attention_mask_decoder,
+             encoder_output=encoder_output,
+             attention_mask_for_encoder=attention_mask_for_encoder,
+-            use_cache=False,  # we are not using cache for training
++            use_cache=False,  # 训练时不使用 cache。
+         )
+         return decoder_output
+ 
+@@ -867,8 +861,8 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             table_name: The name of the table to get the embedding for.
+             hierarchy: The hierarchy level to get the embedding for.
+         """
+-        # here we assume the encoder and decoder share the same embedding table
+-        # we can have flexible embedding table in the future
++        # 这里假设 encoder 和 decoder 共享同一张 embedding table。
++        # 后续可以扩展为更灵活的 embedding table。
+         if table_name == "encoder":
+             embedding_table = self.item_sid_embedding_table_encoder
+         elif table_name == "decoder":
+@@ -910,9 +904,9 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             label_data: The label data to the model. Its optional as it is not required for inference.
+         """
+ 
+-        # if label_data is None, we are in inference mode and doing free-form generation
++        # label_data 为 None 表示推理模式，此时做 free-form generation。
+         if label_data is None:
+-            # this is inference stage
++            # 推理阶段。
+             generated_ids, marginal_probs = self.generate(
+                 attention_mask=model_input.mask,
+                 **{
+@@ -920,14 +914,13 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+                     for k, v in model_input.transformed_sequences.items()
+                 },
+             )
+-            return generated_ids, 0  # returning 0 here because we don't have a loss
++            return generated_ids, 0  # 没有 loss，因此返回 0。
+ 
+         fut_ids = None
+         for label in label_data.labels:
+             curr_label = label_data.labels[label]
+             fut_ids = curr_label.reshape(model_input.mask.size(0), -1)
+-        # here we pass labels in to the forward function
+-        # because the decoder is causal and we are doing shifted prediction
++        # 将 labels 传入 forward，因为 decoder 是 causal 的，这里执行 shifted prediction。
+         model_output = self.forward(
+             attention_mask_encoder=model_input.mask,
+             future_ids=fut_ids,
+@@ -937,11 +930,10 @@ class SemanticIDEncoderDecoder(SemanticIDGenerativeRecommender):
+             },
+         )
+ 
+-        # we prepended a bos token to the decoder input
+-        # so we need to remove the last token in the output
++        # decoder 输入前面补过 bos token，因此需要移除输出中的最后一个 token。
+         model_output = model_output[:, :-1]
+ 
+-        # the label locations is shared for all semantic id hierarchies
++        # 所有 semantic id hierarchy 共享 label 位置。
+         loss = 0
+         for hierarchy in range(self.num_hierarchies):
+ 
+@@ -977,7 +969,7 @@ class SemanticIDDecoderModule(torch.nn.Module):
+         """
+ 
+         super().__init__()
+-        # some sanity checks
++        # 一些基本一致性检查。
+         if bos_token is not None:
+             assert decoder.config.is_decoder == True, "Decoder must be a decoder model"
+             assert (
+@@ -985,10 +977,10 @@ class SemanticIDDecoderModule(torch.nn.Module):
+             ), "Decoder must be a standalone decoder model"
+ 
+         self.decoder = decoder
+-        # this bos token is prompt for the decoder
++        # bos token 作为 decoder 的提示 token。
+         self.bos_token = bos_token
+         self.decoder_mlp = decoder_mlp
+-        # deleting embedding table in the decoder to save space
++        # 删除 decoder 中的 embedding table 以节省空间。
+         delete_module(self.decoder, "embed_tokens")
+         delete_module(self.decoder, "shared")
+         reset_parameters(self.decoder)
+@@ -1053,9 +1045,9 @@ class SemanticIDEncoderModule(torch.nn.Module):
+ 
+         self.num_embeddings_per_hierarchy = num_embeddings
+         self.embedding_dim = embedding_dim
+-        # TODO (clark): take care of chunky position encoding
++        # TODO（clark）：处理 chunky position encoding。
+ 
+-        # deleting embedding table in the encoder to save space
++        # 删除 encoder 中的 embedding table 以节省空间。
+         delete_module(self.encoder, "embed_tokens")
+         delete_module(self.encoder, "shared")
+         reset_parameters(self.encoder)
+@@ -1074,9 +1066,9 @@ class SemanticIDEncoderModule(torch.nn.Module):
+         return embeddings
+ 
+ 
+-# TODO (clark): this is a T5 specific implementation
+-# this class is used for bloating the mlp layers in the encoder and decoder
+-# original T5 implementation only has one layer
++# TODO（clark）：这是 T5 专用实现。
++# 该类用于扩展 encoder 和 decoder 中的 MLP 层数。
++# 原始 T5 实现只有一层。
+ class T5MultiLayerFF(nn.Module):
+     def __init__(self, config: T5Config, num_layers: int):
+         """
+diff --git a/src/modules/clustering/residual_quantization.py b/src/modules/clustering/residual_quantization.py
+index 20e477c..cfac7b0 100644
+--- a/src/modules/clustering/residual_quantization.py
++++ b/src/modules/clustering/residual_quantization.py
+@@ -78,7 +78,7 @@ class ResidualQuantization(LightningModule):
+ 
+         self.verbose = verbose
+         self.log_if_true("Verbose mode enabled", self.verbose)
+-        # We always track residuals if verbose mode is enabled
++        # 启用 verbose 时总是跟踪 residual，便于记录诊断指标。
+         self.track_residuals = track_residuals or self.verbose
+ 
+         self.normalization_layer = normalization_layer
+@@ -106,7 +106,7 @@ class ResidualQuantization(LightningModule):
+         self.train_quantization_loss = MeanMetric()
+         self.train_reconstruction_loss = MeanMetric()
+         if self.verbose:
+-            # Note that if normalize_residuals is True, the residuals norm metrics below are uninformative
++            # 注意：如果 normalize_residuals=True，下面的 residual norm 指标参考价值有限。
+             self.train_first_residuals_norm_ratio = MeanMetric()
+             self.train_last_residuals_norm_ratio = MeanMetric()
+             self.first_centroids_norm = MeanMetric()
+@@ -114,10 +114,8 @@ class ResidualQuantization(LightningModule):
+             self.train_frac_unique_ids = MeanMetric()
+             self.train_mse = MeanMetric()
+             for layer_idx in range(self.n_layers):
+-                # We use MeanMetric to track the fraction of unique ids and the
+-                # entropy of the cluster ids for each layer
+-                # Note that we don't need to move these metrics to the device here,
+-                # because they will be moved to the device in the training_step method
++                # 使用 MeanMetric 跟踪每层 unique id 占比和 cluster id 熵。
++                # 这里无需手动移动到 device，training_step 中会自动处理。
+                 setattr(
+                     self,
+                     f"train_layer_coverages_{layer_idx}",
+@@ -141,7 +139,7 @@ class ResidualQuantization(LightningModule):
+         self.test_mse = MeanMetric()
+         self.test_frac_unique_ids = MeanMetric()
+ 
+-        # We set the initialization buffer sizes for each layer to the same value
++        # 所有量化层使用相同的初始化 buffer 大小。
+         self.init_buffer_size = init_buffer_size
+         for layer in self.quantization_layer_list:
+             layer.init_buffer_size = init_buffer_size
+@@ -211,30 +209,26 @@ class ResidualQuantization(LightningModule):
+             if self.normalize_residuals:
+                 current_residuals = nn.functional.normalize(
+                     current_residuals, dim=-1
+-                )  # normalize along the feature dimension
++                )  # 沿特征维归一化。
+ 
+-            # Determine whether to train the current layer
++            # 判断当前层是否参与训练。
+             train_layer = False
+             if self.trainer.state.fn == TrainerFn.FITTING:
+-                # If we are training layer-wise, we only train the current layer.
++                # 分层训练时，只训练 current_layer 指向的层。
+                 if self.train_layer_wise:
+                     train_layer = idx == self.current_layer
+-                # If we are training all layers simultaneously, there are multiple cases
++                # 同时训练所有层时，需要根据初始化状态决定当前层是否可训练。
+                 else:
+-                    # If the current layer is already initialized, but not all layers
+-                    # are initialized, we do not train the current layer because the
+-                    # initialization of subsequent layers could require a special
+-                    # optimization step that should not be applied to
+-                    # already-initialized layers.
++                    # 如果当前层已经初始化，但并非所有层都完成初始化，
++                    # 则暂不训练当前层。后续层初始化可能需要特殊优化步骤，
++                    # 这些步骤不应作用到已经初始化好的层上。
+                     if (
+                         self.quantization_layer_list[idx].is_initialized
+                         and not self.quantization_layer_list[-1].is_initialized
+                     ):
+                         train_layer = False
+-                    # Otherwise, we always train the first layer, and train subsequent
+-                    # layers as long as the previous layer produced valid quantized
+-                    # embeddings, meaning it has been initialized or is currently in
+-                    # its initialization step.
++                    # 否则，第一层始终可训练；后续层只有在上一层已经初始化
++                    # 或正处于初始化步骤时才训练，因为此时上一层能产生有效量化 embedding。
+                     elif idx == 0:
+                         train_layer = True
+                     elif (
+@@ -244,8 +238,7 @@ class ResidualQuantization(LightningModule):
+                         train_layer = True
+ 
+             if train_layer:
+-                # We call model step inside forward because we need to get the
+-                # quantization layer's loss, which is computed in the model step
++                # 在 forward 中调用 model_step，是因为量化层的 loss 在 model_step 中计算。
+                 layer_ids, layer_embeddings, layer_loss = layer.model_step(
+                     current_residuals
+                 )
+@@ -253,13 +246,13 @@ class ResidualQuantization(LightningModule):
+             else:
+                 layer_ids, layer_embeddings = layer.predict_step(current_residuals)
+ 
+-            cluster_ids.append(layer_ids)  # batch_size
++            cluster_ids.append(layer_ids)  # 形状为 batch_size。
+             quantized_embeddings = quantized_embeddings + layer_embeddings
+             current_residuals = current_residuals - layer_embeddings
+             if self.track_residuals:
+                 all_residuals.append(current_residuals)
+ 
+-        cluster_ids = torch.stack(cluster_ids, dim=-1)  # batch_size x n_layers
++        cluster_ids = torch.stack(cluster_ids, dim=-1)  # 形状为 batch_size x n_layers。
+         all_residuals = (
+             torch.stack(all_residuals, dim=-1) if self.track_residuals else None
+         )
+@@ -301,7 +294,7 @@ class ResidualQuantization(LightningModule):
+             and self.reconstruction_loss_function is not None
+             and self.quantization_layer_list[-1].is_initialized
+         ):
+-            # Compute the reconstruction loss
++            # 计算重建损失。
+             reconstructed_embeddings = self.decoder(quantized_embeddings)
+             reconstruction_loss = self.reconstruction_loss_function(
+                 reconstructed_embeddings, normalized_input_embeddings
+@@ -326,8 +319,8 @@ class ResidualQuantization(LightningModule):
+         Returns:
+             loss: The loss value.
+         """
+-        # Lightning wraps the batch in a tuple for training, we get the batch from
+-        # position 0. This behavior only happens for training_step.
++        # Lightning 在 training_step 中会把 batch 包进 tuple，因此这里取第 0 个元素。
++        # 该行为只出现在 training_step。
+         model_input: ItemData = batch[0]
+         (
+             cluster_ids,
+@@ -351,7 +344,7 @@ class ResidualQuantization(LightningModule):
+ 
+         with torch.no_grad():
+             if self.verbose and self.global_step % self.trainer.log_every_n_steps == 0:
+-                # Compute verbose ID statistics
++                # 计算 verbose 模式下的 ID 统计信息。
+                 (
+                     train_first_residuals_norm_ratio,
+                     train_last_residuals_norm_ratio,
+@@ -368,7 +361,7 @@ class ResidualQuantization(LightningModule):
+                         "input_embedding"
+                     ],
+                 )
+-                # Update the metrics
++                # 更新指标对象。
+                 self.train_first_residuals_norm_ratio(train_first_residuals_norm_ratio)
+                 self.train_last_residuals_norm_ratio(train_last_residuals_norm_ratio)
+                 self.first_centroids_norm(first_centroids_norm)
+@@ -423,8 +416,8 @@ class ResidualQuantization(LightningModule):
+             sync_dist=True,
+         )
+ 
+-        # If a training loop function is passed, we call it with the module and the loss
+-        # Otherwise we use the automatic optimization provided by Lightning
++        # 如果传入自定义 training_loop_function，则用它执行优化；
++        # 否则使用 Lightning 的自动优化。
+         if self.training_loop_function is not None:
+             if self.train_layer_wise:
+                 layer_to_check = self.current_layer
+@@ -529,10 +522,10 @@ class ResidualQuantization(LightningModule):
+                     quantization layer.
+                 - last_centroids_norm: The norm of the centroids of the last
+                     quantization layer.
+-                - frac_unique_ids: # distinct item ID sequences / batch_size.
++                - frac_unique_ids: 不同 item ID 序列数 / batch_size。
+                 - mse: The mean squared error of the last residuals (target is 0).
+                 - layer_coverages: A list containing, for each quantization layer,
+-                    # distinct IDs / # clusters in that layer.
++                    不同 ID 数 / 该层 cluster 数。
+                 - layer_id_entropies: A list containing, for each quantization layer,
+                     the batch entropy of the cluster ids in that layer.
+         """
+@@ -782,7 +775,7 @@ class ResidualQuantization(LightningModule):
+         checkpoint["layers_initialized"] = [
+             layer.is_initialized for layer in self.quantization_layer_list
+         ]
+-        # We do not save the input embedding cache as this can be very large
++        # 不保存 input embedding cache，因为它可能非常大。
+         return super().on_save_checkpoint(checkpoint)
+ 
+     def log_if_true(self, message: str, condition: bool) -> None:
+diff --git a/src/modules/clustering/vector_quantization.py b/src/modules/clustering/vector_quantization.py
+index adea12b..3daf687 100644
+--- a/src/modules/clustering/vector_quantization.py
++++ b/src/modules/clustering/vector_quantization.py
+@@ -109,8 +109,7 @@ class VectorQuantization(BaseClusteringModule):
+         if batch.device != self.device:
+             batch = batch.to(self.device)
+ 
+-        # Initialize centroids using the chosen method
+-        # Buffer initial batches for better initialization
++        # 使用指定方法初始化中心；先缓存若干初始 batch，让初始化更稳定。
+         if self.is_initial_step:
+             self.is_initial_step = False
+             self.is_initialized = True
+@@ -118,7 +117,7 @@ class VectorQuantization(BaseClusteringModule):
+             return self.initialization_step(batch)
+ 
+         assignments, embeddings, reconstruction_loss_embeddings = self.forward(batch)
+-        loss = self.loss_function(batch, embeddings)  # quantization loss
++        loss = self.loss_function(batch, embeddings)  # 量化损失。
+         return (
+             assignments,
+             reconstruction_loss_embeddings
+diff --git a/src/modules/semantic_embedding_inference_module.py b/src/modules/semantic_embedding_inference_module.py
+index da50c6d..80fe5fd 100644
+--- a/src/modules/semantic_embedding_inference_module.py
++++ b/src/modules/semantic_embedding_inference_module.py
+@@ -31,7 +31,7 @@ class SemanticEmbeddingInferenceModule(LightningModule):
+         super().__init__()
+ 
+         self.semantic_embedding_model = semantic_embedding_model
+-        # We use a frozen embedding module to compute the input embeddings
++        # 使用冻结的 embedding 模块计算输入 embedding，推理时不更新参数。
+         for param in self.semantic_embedding_model.parameters():
+             param.requires_grad = False
+         self.semantic_embedding_model_input_map = semantic_embedding_model_input_map
+diff --git a/src/train.py b/src/train.py
+index 1516649..2f8255a 100755
+--- a/src/train.py
++++ b/src/train.py
+@@ -9,20 +9,20 @@ from omegaconf import DictConfig
+ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+ 
+ # ------------------------------------------------------------------------------------ #
+-# the setup_root above is equivalent to:
+-# - adding project root dir to PYTHONPATH
+-#       (so you don't need to force user to install project as a package)
+-#       (necessary before importing any local modules e.g. `from src import utils`)
+-# - setting up PROJECT_ROOT environment variable
+-#       (which is used as a base for paths in "configs/paths/default.yaml")
+-#       (this way all filepaths are the same no matter where you run the code)
+-# - loading environment variables from ".env" in root dir
++# 上面的 setup_root 等价于：
++# - 将项目根目录加入 PYTHONPATH
++#       （因此无需强制用户把项目安装成 package）
++#       （在导入本地模块前是必需的，例如 `from src import utils`）
++# - 设置 PROJECT_ROOT 环境变量
++#       （它会作为 "configs/paths/default.yaml" 中路径的基础）
++#       （这样无论从哪里运行代码，文件路径都保持一致）
++# - 从根目录下的 ".env" 加载环境变量
+ #
+-# you can remove it if you:
+-# 1. either install project as a package or move entry files to project root dir
+-# 2. set `root_dir` to "." in "configs/paths/default.yaml"
++# 满足以下条件时可以移除它：
++# 1. 将项目安装为 package，或把入口文件移动到项目根目录
++# 2. 在 "configs/paths/default.yaml" 中将 `root_dir` 设为 "."
+ #
+-# more info: https://github.com/ashleve/rootutils
++# 更多信息：https://github.com/ashleve/rootutils
+ # ------------------------------------------------------------------------------------ #
+ from src.utils import RankedLogger, extras
+ from src.utils.custom_hydra_resolvers import *
+@@ -44,8 +44,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+     :param cfg: A DictConfig configuration composed by Hydra.
+     :return: A tuple with metrics and dict with all instantiated objects.
+     """
+-    # Pipeline launcher initializes the modules needed for the pipeline to run.
+-    # It also serves as a context manager, so all resources are properly closed after the pipeline is done.
++    # pipeline_launcher 初始化运行 pipeline 所需的模块。
++    # 它同时作为上下文管理器，确保 pipeline 结束后正确关闭资源。
+     with pipeline_launcher(cfg) as pipeline_modules:
+ 
+         if cfg.get("train"):
+@@ -59,17 +59,16 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+ 
+         if cfg.get("test"):
+             command_line_logger.info("Starting testing!")
+-            ckpt_path = None
+-            # Check if a checkpoint callback is available and if it has a best model path.
+-            # Note that if multiple checkpoint callbacks are used, only the first one will be used
+-            # to determine the best model path for testing.
++            ckpt_path = cfg.get("ckpt_path")
++            # 检查是否存在 checkpoint callback，以及它是否记录了最佳模型路径。
++            # 如果使用多个 checkpoint callback，只使用第一个来决定测试用的最佳模型路径。
+             checkpoint_callback = getattr(
+                 pipeline_modules.trainer, "checkpoint_callback", None
+             )
+             if checkpoint_callback:
+-                ckpt_path = getattr(checkpoint_callback, "best_model_path", None)
+-                if ckpt_path == "":
+-                    ckpt_path = None
++                best_ckpt_path = getattr(checkpoint_callback, "best_model_path", None)
++                if best_ckpt_path:
++                    ckpt_path = best_ckpt_path
+             if not ckpt_path:
+                 command_line_logger.warning(
+                     "Best checkpoint not found! Using current weights for testing..."
+@@ -83,7 +82,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+ 
+         test_metrics = pipeline_modules.trainer.callback_metrics
+ 
+-        # merge train and test metrics
++        # 合并训练和测试指标。
+         metric_dict = {**train_metrics, **test_metrics}
+ 
+         command_line_logger.info(f"Metrics: {metric_dict}")
+@@ -96,8 +95,8 @@ def main(cfg: DictConfig) -> Optional[float]:
+     :param cfg: DictConfig configuration composed by Hydra.
+     :return: Optional[float] with optimized metric value.
+     """
+-    # apply extra utilities
+-    # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
++    # 应用额外工具逻辑。
++    # 例如：cfg 中没有 tags 时提示输入，打印配置树等。
+     extras(cfg)
+     job_launcher = LocalJobLauncher(cfg=cfg)
+     job_launcher.launch(function_to_run=train)
+diff --git a/src/utils/custom_hydra_resolvers.py b/src/utils/custom_hydra_resolvers.py
+index 77a5eee..df826a6 100755
+--- a/src/utils/custom_hydra_resolvers.py
++++ b/src/utils/custom_hydra_resolvers.py
+@@ -29,7 +29,7 @@ def conditional_expression(
+     A generic resolver that evaluates a condition expression based on config values.
+     """
+     try:
+-        # Evaluate the condition expression with the config context
++        # 在配置上下文中计算条件表达式。
+         result = eval(condition_expression, {}, kwargs)
+         return value_if_true if result else value_if_false
+     except Exception as e:
+@@ -118,7 +118,7 @@ def math_eval(expression: str) -> float:
+     dim_2: 96
+     ${math_eval:${dim_1}+${dim_2}} returns 128
+     """
+-    # Supported operators
++    # 受支持的运算符。
+     operators = {
+         ast.Add: op.add,
+         ast.Sub: op.sub,
+@@ -130,13 +130,13 @@ def math_eval(expression: str) -> float:
+     }
+ 
+     def eval_(node):
+-        # Recursively evaluate the AST nodes
++        # 递归计算 AST 节点，避免直接 eval 任意表达式。
+         match node:
+             case ast.Constant(value) if isinstance(value, int):
+-                return value  # integer
++                return value  # 整数。
+             case ast.BinOp(left, op, right):
+                 return operators[type(op)](eval_(left), eval_(right))
+-            case ast.UnaryOp(op, operand):  # e.g., -1
++            case ast.UnaryOp(op, operand):  # 例如 -1。
+                 return operators[type(op)](eval_(operand))
+             case _:
+                 raise TypeError(node)
+@@ -154,8 +154,8 @@ def remove_item_from_list(input_list: ListConfig, item_to_remove: str) -> ListCo
+     return ListConfig([item for item in input_list if item != item_to_remove])
+ 
+ 
+-# resolvers need to be registered to be accessible during config composition.
+-# The resolver name is the function name without the type annotations.
++# resolver 需要注册后才能在配置组合过程中访问。
++# resolver 名称使用不带类型注解的函数名。
+ OmegaConf.register_new_resolver("remove_chars_from_string", remove_chars_from_string)
+ OmegaConf.register_new_resolver("conditional_expression", conditional_expression)
+ OmegaConf.register_new_resolver(
+diff --git a/src/utils/decorators.py b/src/utils/decorators.py
+index 3d5433a..0cc6025 100755
+--- a/src/utils/decorators.py
++++ b/src/utils/decorators.py
+@@ -7,7 +7,7 @@ from typing import Callable, Optional, Tuple, Type, TypeVar
+ 
+ from src.utils.pylogger import RankedLogger
+ 
+-T = TypeVar("T")  # return type
++T = TypeVar("T")  # 返回类型。
+ 
+ logger = RankedLogger(__name__)
+ 
+@@ -64,9 +64,9 @@ def timeout(
+             try:
+                 result = func(*args, **kwargs)
+             finally:
+-                # cancel the alarm
++                # 取消当前 alarm。
+                 signal.alarm(0)
+-                # reinstall the old signal handler
++                # 恢复旧的信号处理器。
+                 signal.signal(signal.SIGALRM, old)
+             return result
+ 
+@@ -138,10 +138,10 @@ def retry(
+                     raise
+                 except acceptable_exceptions as e:
+                     if mtries == 0:
+-                        # Failed for the final time
++                        # 最后一次尝试仍然失败。
+                         logger.exception(f"Failed for the last time: {e}")
+                         if should_throw_original_exception:
+-                            raise  # Reraise original exception
++                            raise  # 重新抛出原始异常。
+                         raise RetriesFailedException(
+                             f"Retry failed, permanently failing {f.__module__}:{f.__name__}, see logs for {e}"
+                         )
+diff --git a/src/utils/file_utils.py b/src/utils/file_utils.py
+index 8d52078..bafbba2 100755
+--- a/src/utils/file_utils.py
++++ b/src/utils/file_utils.py
+@@ -48,8 +48,8 @@ def load_json(file_path: str) -> dict:
+ 
+ @retry()
+ def open_pyarrow_file(file_path: str):
+-    # Optimized function for large pyarrow files (ie. parquet)
+-    # enable us to read row groups instead of entire file.
++    # 针对大型 pyarrow 文件（例如 parquet）的优化读取方式。
++    # 这样可以按 row group 读取，而不是一次读完整个文件。
+     fs, path = pyarrow_fs.FileSystem.from_uri(file_path)
+     return fs.open_input_file(path)
+ 
+@@ -94,9 +94,9 @@ def remove_file_extension(path: _PATH) -> _PATH:
+ 
+ 
+ def has_no_extension(filepath: _PATH) -> bool:
+-    # Extract just the filename from the path, handles both local and cloud paths
++    # 只提取文件名，兼容本地路径和云端路径。
+     filename = os.path.basename(filepath)
+-    # Split the filename and check if extension is empty
++    # 拆分文件名并检查扩展名是否为空。
+     _, extension = os.path.splitext(filename)
+     return extension == ""
+ 
+@@ -116,13 +116,13 @@ def list_subfolders(
+     Returns:
+         list: List of folder paths
+     """
+-    # Get the appropriate filesystem
++    # 获取路径对应的文件系统实现。
+     fs, _ = url_to_fs(directory_path)
+ 
+-    # List all items in the directory
++    # 列出目录下所有条目。
+     all_items = fs.ls(directory_path)
+ 
+-    # Filter to only include directories that are not the original one.
++    # 只保留子目录，并排除目录自身。
+     folders = [
+         f"{fs.protocol[0]}://{item}" if should_update_prefix else item
+         for item in all_items
+@@ -136,17 +136,17 @@ def list_subfolders(
+ def list_files(
+     folder_path: str,
+     suffix: str = "*",
+-    # if should_update_prefix is True, adds the prefix based on the filesystem,
+-    # otherwise returns the path generated by glob
++    # 如果 should_update_prefix 为 True，则根据文件系统补齐协议前缀；
++    # 否则直接返回 glob 生成的路径。
+     should_update_prefix: bool = True,
+ ) -> List[str]:
+ 
+-    # We remove trailing slashes to avoid double slashes in the path
++    # 移除尾部斜杠，避免拼接路径时出现双斜杠。
+     folder_path = folder_path.removesuffix("/")
+ 
+     fs, _ = url_to_fs(folder_path)
+     return (
+-        # add the prefix for gcs.
++        # 为 gcs 路径补充协议前缀。
+         [f"{fs.protocol[0]}://{x}" for x in fs.glob(f"{folder_path}/{suffix}")]
+         if should_update_prefix
+         else fs.glob(f"{folder_path}/{suffix}")
+@@ -176,26 +176,26 @@ def replace_char_after_segment(
+         str: The modified path with character replacements.
+             If segment_to_find is provided but not found, returns the original path unchanged.
+     """
+-    # If no segment is specified, replace throughout the entire string
++    # 未指定 segment 时，在整条路径中替换。
+     if segment_to_find is None:
+         return path.replace(char_to_replace, replacement_char)
+ 
+-    # Find the position of the segment in the path
++    # 查找 segment 在路径中的位置。
+     segment_index = path.find(segment_to_find)
+ 
+     if segment_index != -1:
+-        # Include the full segment in the "before" part
++        # before 部分保留完整 segment。
+         segment_end = segment_index + len(segment_to_find)
+         before_segment = path[:segment_end]
+         after_segment = path[segment_end:]
+ 
+-        # Replace characters only in the part after the segment
++        # 只替换 segment 后面的路径片段。
+         modified_after_segment = after_segment.replace(
+             char_to_replace, replacement_char
+         )
+ 
+-        # Combine the parts
++        # 拼回未替换部分和已替换部分。
+         return before_segment + modified_after_segment
+ 
+-    # If segment is not found, return the original path unchanged
++    # 找不到 segment 时，原样返回路径。
+     return path
+diff --git a/src/utils/inference_utils.py b/src/utils/inference_utils.py
+index cbde1c3..dff04f9 100755
+--- a/src/utils/inference_utils.py
++++ b/src/utils/inference_utils.py
+@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
+ class BaseBufferedWriter(BasePredictionWriter):
+     def __init__(
+         self,
+-        # Update this based on data size. The goal is to limit the number of writes to BQ without exceeding the memory of your machine.
++        # 根据数据规模调整该值，目标是在不超过机器内存的前提下减少写入 BQ 的次数。
+         flush_frequency: int = 5000,
+         write_interval: str = "batch",
+         schema: Optional[List[Union[bigquery.SchemaField, pa.Field]]] = None,
+@@ -43,7 +43,7 @@ class BaseBufferedWriter(BasePredictionWriter):
+         """
+         super().__init__(write_interval)
+         self.flush_frequency = flush_frequency
+-        # Buffer to accumulate rows before writing
++        # 写出前用于累积行数据的缓冲区。
+         self.rows_buffer: List[dict] = []
+         self.schema = schema
+         self.global_rank = None
+@@ -53,14 +53,11 @@ class BaseBufferedWriter(BasePredictionWriter):
+     def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+         self.global_rank = trainer.global_rank if trainer.global_rank else 0
+         log.info(f"Rank {self.global_rank} initialized for inference.")
+-        # If the module does not have the prediction_key_name or prediction_name attributes,
+-        # we don't do anything as it might be using the previous interface.
+-        # If the module has the attributes and they are set, we also don't change it as they
+-        # might be hardcoded in the module.
+-        # We only set the prediction_key_name or prediction_name if they are not set in the module but are
+-        # passed in the callback. This allows us to control the prediction_key_name and prediction_name
+-        # from the callback config.
+-        # TODO (lneves) Deprecate the way folks do and have all inference pipelines to use this.
++        # 如果模块没有 prediction_key_name 或 prediction_name 属性，说明它可能仍在使用旧接口。
++        # 如果模块已有这些属性且已经设置，也不覆盖，因为它们可能在模块中硬编码。
++        # 只有当模块属性未设置、且 callback 中传入了对应值时，才从 callback 配置写入。
++        # 这样可以通过 callback 配置统一控制 prediction_key_name 和 prediction_name。
++        # TODO（lneves）：废弃旧接口，让所有推理 pipeline 都使用这种方式。
+ 
+         if (
+             hasattr(pl_module, "prediction_key_name")
+@@ -140,10 +137,10 @@ class BaseBufferedWriter(BasePredictionWriter):
+         We'll continue to buffer predictions from all batches in this epoch
+         and flush if the buffer exceeds flush_frequency.
+         """
+-        # predictions is typically a list of tensors (one per batch).
++        # predictions 通常是一个列表，每个 batch 对应一个预测结果。
+         for batch_pred in predictions:
+             self.handle_batch(batch_pred)
+-        # At the very end of the epoch, flush any remaining rows
++        # epoch 结束时刷出仍留在缓冲区中的行。
+         self.flush_buffer()
+ 
+     def on_predict_end(
+@@ -157,12 +154,10 @@ class BaseBufferedWriter(BasePredictionWriter):
+         """
+         self.flush_buffer()
+         log.info(f"Rank {self.global_rank} finished writing predictions.")
+-        # TODO (clark): technically write_on_epoch_end should handle this correctly
+-        # but if we dont't do this as well here, the number of rows in the final BQ table will
+-        # always be a multiplier of flush_frequency
+-        # and we will lose some rows if the last batch is smaller than flush_frequency
+-        # this is an indicator of something not working fully as expected
+-        # i'll investigate this issue later
++        # TODO（clark）：理论上 write_on_epoch_end 应该已经正确处理这里的 flush。
++        # 但如果这里不再执行一次，最终 BQ 表中的行数总会是 flush_frequency 的倍数；
++        # 当最后一个 batch 小于 flush_frequency 时，会丢失这部分行。
++        # 这说明当前流程仍有不符合预期的地方，后续需要继续排查。
+ 
+ class LocalPickleWriter(BaseBufferedWriter):
+     """
+@@ -222,6 +217,10 @@ class LocalPickleWriter(BaseBufferedWriter):
+             f"Global Rank: {self.global_rank} wrote {len(self.rows_buffer)} rows to {self._local_file_path(file_path=file_path)}."
+         )
+ 
++    def _barrier_if_distributed(self) -> None:
++        if torch.distributed.is_available() and torch.distributed.is_initialized():
++            torch.distributed.barrier()
++
+     @retry()
+     def on_predict_end(
+         self,
+@@ -231,19 +230,16 @@ class LocalPickleWriter(BaseBufferedWriter):
+         super().on_predict_end(trainer, pl_module)
+ 
+         if self.should_merge_files_on_main:
+-            # if we use multiple workers, we need to wait for all of them to finish writing
+-            # before merging the files
+-            if trainer.global_rank != None:
+-                torch.distributed.barrier()
++            # 如果使用多个 worker，需要等待所有进程完成写入后再合并文件。
++            self._barrier_if_distributed()
+             if self.global_rank == 0:
+                 log.info("Merging pickle files on main process.")
+                 self._merge_files()
+ 
+-            # other processes can continue after merging
+-            if trainer.global_rank != None:
+-                torch.distributed.barrier()
++            # 合并完成后，其它进程再继续往下执行。
++            self._barrier_if_distributed()
+ 
+-        # conducting post-processing functions on the files
++        # 对输出文件执行配置中的后处理函数。
+         for process_func in self.post_processing_functions:
+             all_files = [f for f in os.listdir(self.output_dir)]
+             for file in all_files:
+@@ -253,8 +249,7 @@ class LocalPickleWriter(BaseBufferedWriter):
+                         process_func["function"](file_path)
+                 else:
+                     process_func["function"](file_path)
+-                if trainer.global_rank != None:
+-                    torch.distributed.barrier()
++                self._barrier_if_distributed()
+ 
+     def _merge_files(self):
+         """Merge all pickle files in the output directory into a single file."""
+diff --git a/src/utils/launcher_utils.py b/src/utils/launcher_utils.py
+index 0a9322f..000940e 100755
+--- a/src/utils/launcher_utils.py
++++ b/src/utils/launcher_utils.py
+@@ -32,7 +32,7 @@ class PipelineModules:
+     cfg: DictConfig
+     datamodule: LightningDataModule
+     model: LightningModule
+-    # We use the plural form to match the names used by lightning
++    # 使用复数形式以匹配 Lightning 中的命名。
+     callbacks: List[Callback]
+     loggers: List[Logger]
+     trainer: Trainer
+@@ -61,13 +61,13 @@ def update_cfg_with_most_recent_checkpoint_path(cfg: DictConfig) -> str:
+         and has_no_extension(ckpt_path)
+         and cfg.get("should_retrieve_latest_ckpt_path", False)
+     ):
+-        # If a path to a folder is passed, we assume it contains folders with versions of checkpoints.
+-        # We expect those folders to be named using a timestamp.
++        # 如果传入的是目录路径，则假设其中包含按版本组织的 checkpoint 子目录。
++        # 这些子目录预期使用时间戳命名，便于按名称倒序取最新版本。
+         checkpoint_folders = list_subfolders(ckpt_path)
+         if len(checkpoint_folders) > 0:
+-            # We sort them in reverse order to get the most recent one.
++            # 倒序排序以获取最新目录。
+             checkpoint_folders.sort(reverse=True)
+-            # We take the first one, which is the most recent one.
++            # 第一个目录就是最新目录。
+             latest_ckpt_folder = checkpoint_folders[0]
+             last_modified = get_last_modified_file(
+                 folder_path=latest_ckpt_folder, suffix="*.ckpt"
+@@ -78,20 +78,20 @@ def update_cfg_with_most_recent_checkpoint_path(cfg: DictConfig) -> str:
+                     f"Found most recent checkpoint path: {ckpt_path}. Starting job from this checkpoint."
+                 )
+ 
+-    # If there is a checkpoint callback running, and the restart_metadata file shows we are not on the first run,
+-    # we check if there are checkpoints in the checkpoint folder and restart from there instead of the initial checkpoint.
++    # 如果启用了 checkpoint 与重试 callback，且 restart_metadata 表明当前不是第一次运行，
++    # 则优先从 checkpoint 目录中最新的 checkpoint 恢复，而不是使用初始 ckpt_path。
+     if (
+-        cfg.get("callbacks")  # has callbacks
+-        and cfg.callbacks.get("model_checkpoint")  # has checkpoint callback
+-        and cfg.callbacks.get("restart_job")  # has retry callback
++        cfg.get("callbacks")  # 存在 callbacks 配置。
++        and cfg.callbacks.get("model_checkpoint")  # 存在 checkpoint callback。
++        and cfg.callbacks.get("restart_job")  # 存在重试 callback。
+         and get_attribute_from_metadata_file(
+             f"{cfg.callbacks.restart_job.metadata_dir}/restart_metadata.json",
+             "current_run",
+         )
+-        > 0  # current run is part of a retry
++        > 0  # 当前运行属于重试流程。
+     ):
+         checkpoint_folder = cfg.callbacks.model_checkpoint.dirpath
+-        # We check if there are files with the extension .ckpt in the checkpoint folder. If so, we get the latest one.
++        # 查找 checkpoint 目录中的 .ckpt 文件，并选择最近修改的一个。
+         last_modified = get_last_modified_file(
+             folder_path=checkpoint_folder, suffix="*.ckpt"
+         )
+@@ -117,7 +117,7 @@ def initialize_pipeline_modules(
+     Returns:
+         PipelineModules: A dataclass containing the instantiated objects.
+     """
+-    # set seed for random number generators in pytorch, numpy and python.random
++    # 设置 PyTorch、NumPy 和 python.random 的随机数种子。
+     if cfg.get("seed"):
+         L.seed_everything(cfg.seed, workers=True)
+ 
+@@ -144,11 +144,9 @@ def initialize_pipeline_modules(
+     trainer: Trainer = hydra.utils.instantiate(
+         cfg.trainer,
+         callbacks=callbacks,
+-        # The default behavior for lightning it to set `enable_checkpointing` and
+-        # `enable_model_summary` to True, which might be misleading when we are trying to
+-        # debug. We change the default to False, but this can be overriden by either
+-        # setting the parameters in the config file or passing the callbacks as part
+-        # of the callbacks yaml.
++        # Lightning 默认会将 `enable_checkpointing` 和 `enable_model_summary` 设为 True，
++        # 调试时这可能造成误导。这里改为根据 callbacks 是否实际存在来决定，
++        # 也允许通过配置文件或 callbacks yaml 显式覆盖。
+         enable_checkpointing=cfg.trainer.get(
+             "enable_checkpointing",
+             has_class_object_inside_list(callbacks, ModelCheckpoint),
+@@ -190,7 +188,7 @@ def pipeline_launcher(cfg: DictConfig):
+ 
+     try:
+         pipeline_modules: PipelineModules = initialize_pipeline_modules(cfg)
+-        # Log hyperparameters if loggers are present
++        # 如果配置了 logger，则记录超参数。
+         if len(pipeline_modules.loggers) > 0:
+             command_line_logger.info("Logging hyperparameters!")
+             log_hyperparameters(cfg, pipeline_modules.model, pipeline_modules.trainer)
+@@ -198,5 +196,5 @@ def pipeline_launcher(cfg: DictConfig):
+     except Exception as ex:
+         raise ex
+     finally:
+-        # We add the try catch to make sure the loggers are finalized even if the task fails.
++        # 即使任务失败，也要确保 logger 被 finalize。
+         finalize_loggers(pipeline_modules.trainer)
+diff --git a/src/utils/logging_utils.py b/src/utils/logging_utils.py
+index 1582515..ba5cf52 100755
+--- a/src/utils/logging_utils.py
++++ b/src/utils/logging_utils.py
+@@ -12,7 +12,7 @@ from src.utils import pylogger
+ 
+ log = pylogger.RankedLogger(__name__, rank_zero_only=True)
+ 
+-# logging constants
++# 日志常量。
+ END_RUN = "end_run"
+ 
+ 
+@@ -25,10 +25,10 @@ def login_wandb():
+     """
+     If WANDB_API_KEY is set in the environment, login to wandb.
+     """
+-    # Load environment variables from .env file
++    # 从 .env 文件加载环境变量。
+     load_dotenv()
+ 
+-    # Now you can access the WANDB_API_KEY
++    # 读取 WANDB_API_KEY 并按需登录 wandb。
+     wandb_api_key = os.getenv("WANDB_API_KEY")
+     if wandb_api_key:
+         import wandb
+@@ -51,7 +51,7 @@ def finalize_loggers(trainer: Any, status=END_RUN) -> None:
+ 
+     if find_spec(
+         "wandb"
+-    ):  # check if wandb is installed. If so, close connection to wandb.
++    ):  # 检查是否安装了 wandb；如果已安装，则关闭 wandb 连接。
+         import wandb
+ 
+         if wandb.run:
+@@ -74,7 +74,7 @@ def log_hyperparameters(
+         - `"trainer"`: The Lightning trainer.
+     """
+     hparams = {}
+-    # We resolve the configs to get the actual paths for logging.
++    # 解析配置，拿到用于日志记录的实际路径。
+     cfg = OmegaConf.to_container(cfg, resolve=True)
+ 
+     if not trainer.logger:
+@@ -84,7 +84,7 @@ def log_hyperparameters(
+     hparams["paths"] = cfg["paths"]
+     hparams["model"] = cfg["model"]
+ 
+-    # save number of model parameters
++    # 保存模型参数数量。
+     hparams["model/params/total"] = sum(p.numel() for p in model.parameters())
+     hparams["model/params/trainable"] = sum(
+         p.numel() for p in model.parameters() if p.requires_grad
+@@ -104,6 +104,6 @@ def log_hyperparameters(
+     hparams["ckpt_path"] = cfg.get("ckpt_path")
+     hparams["seed"] = cfg.get("seed")
+ 
+-    # send hparams to all loggers
++    # 将超参数发送到所有 logger。
+     for logger in trainer.loggers:
+         logger.log_hyperparams(hparams)
+diff --git a/src/utils/masking_utils.py b/src/utils/masking_utils.py
+index 87b25e2..7fd2399 100755
+--- a/src/utils/masking_utils.py
++++ b/src/utils/masking_utils.py
+@@ -28,15 +28,15 @@ def create_last_k_mask(
+             raise ValueError("last_k must be None or greater than or equal to 1")
+         start_index = torch.clamp(
+             last_item_index - last_k + 1, min=0
+-        )  # Shape (batch_size,)
++        )  # 形状为 (batch_size,)。
+ 
+     indices = (
+         torch.arange(sequence_length, device=last_item_index.device)
+         .unsqueeze(0)
+         .expand(last_item_index.size(0), -1)
+-    )  # shape (batch_size, sequence_length)
++    )  # 形状为 (batch_size, sequence_length)。
+ 
+     mask = (indices >= start_index.unsqueeze(1)) & (
+         indices <= last_item_index.unsqueeze(1)
+-    )  # Shape (batch_size, sequence_length)
++    )  # 形状为 (batch_size, sequence_length)。
+     return mask
+diff --git a/src/utils/restart_job.py b/src/utils/restart_job.py
+index 7fba0cb..25a64c7 100755
+--- a/src/utils/restart_job.py
++++ b/src/utils/restart_job.py
+@@ -79,7 +79,7 @@ class RestartAndLoadCheckpointCallback(Callback):
+         self._save_metadata()
+ 
+     def _load_metadata(self) -> None:
+-        # Load metadata from disk, if it exists, then save it to the metadata attribute
++        # 从磁盘加载已有元数据，并保存到 metadata 属性中。
+         self.metadata: JobCheckpointMetadata = load_metadata_from_local_or_remote(
+             self.metadata_path
+         )
+@@ -96,7 +96,7 @@ class RestartAndLoadCheckpointCallback(Callback):
+         self.metadata.node_rank = getattr(trainer, "node_rank", 0)
+         self.metadata.master_addr = os.environ.get("MASTER_ADDR", "")
+ 
+-        # Track used ports
++        # 记录已经使用过的端口，重启时可避开冲突。
+         master_port = os.environ.get("MASTER_PORT", "")
+         if master_port and master_port not in self.metadata.used_ports:
+             self.metadata.used_ports.append(master_port)
+@@ -125,7 +125,7 @@ class RestartAndLoadCheckpointCallback(Callback):
+         command_line_logger.info(f"Restarting job. Current metadata: {self.metadata}")
+         self._save_metadata()
+ 
+-        # Clean up resources
++        # 异常后先清理资源，再交给外层重试。
+         self._cleanup_resources(trainer, exception)
+ 
+     def _cleanup_resources(self, trainer: Trainer, exception: Exception) -> None:
+@@ -135,7 +135,7 @@ class RestartAndLoadCheckpointCallback(Callback):
+         os._exit(1)
+ 
+ 
+-## Launcher
++## 启动器
+ 
+ 
+ class BaseJobLauncher:
+diff --git a/src/utils/restart_job_utils.py b/src/utils/restart_job_utils.py
+index c4b5470..8b66406 100755
+--- a/src/utils/restart_job_utils.py
++++ b/src/utils/restart_job_utils.py
+@@ -146,10 +146,10 @@ def save_metadata_to_local_or_remote(
+         f"Saving metadata to {metadata_path}. {metadata.to_dict()}"
+     )
+ 
+-    # Convert metadata to JSON string
++    # 将元数据序列化为 JSON 字符串，便于本地或远端一致写入。
+     json_content = json.dumps(metadata.to_dict(), indent=2)
+ 
+-    # Use the open_local_or_remote function which should handle gs:// paths
++    # 使用 open_local_or_remote 统一处理本地路径和 gs:// 路径。
+     with open_local_or_remote(metadata_path, "w") as f:
+         f.write(json_content)
+ 
+@@ -197,9 +197,9 @@ def _is_process_running(proc: psutil.Process) -> bool:
+     Returns:
+         bool: True if the process is still running, False otherwise.
+     """
+-    # Check if the process is running by checking the return code.
+-    # If the process is still running, poll() will return None.
+-    # If the process has finished, poll() will return the return code.
++    # 通过返回码判断进程是否仍在运行。
++    # 如果进程仍在运行，poll() 会返回 None。
++    # 如果进程已经结束，poll() 会返回进程返回码。
+     proc.poll()
+     return proc.returncode is None
+ 
+diff --git a/src/utils/rich_utils.py b/src/utils/rich_utils.py
+index 16e06e7..b41554d 100755
+--- a/src/utils/rich_utils.py
++++ b/src/utils/rich_utils.py
+@@ -43,18 +43,18 @@ def print_config_tree(
+ 
+     queue = []
+ 
+-    # add fields from `print_order` to queue
++    # 先将 `print_order` 中指定的字段加入队列。
+     for field in print_order:
+         queue.append(field) if field in cfg else log.warning(
+             f"Field '{field}' not found in config. Skipping '{field}' config printing..."
+         )
+ 
+-    # add all the other fields to queue (not specified in `print_order`)
++    # 再加入没有在 `print_order` 中显式指定的其它字段。
+     for field in cfg:
+         if field not in queue:
+             queue.append(field)
+ 
+-    # generate config tree from queue
++    # 按队列顺序生成配置树。
+     for field in queue:
+         branch = tree.add(field, style=style, guide_style=style)
+ 
+@@ -66,10 +66,10 @@ def print_config_tree(
+ 
+         branch.add(rich.syntax.Syntax(branch_content, "yaml"))
+ 
+-    # print config tree
++    # 打印配置树。
+     rich.print(tree)
+ 
+-    # save config tree to file
++    # 按需将配置树保存到文件。
+     if save_to_file:
+         with open_local_or_remote(
+             f"{cfg.paths.output_dir}/config_tree.log", "w"
+diff --git a/src/utils/tensor_utils.py b/src/utils/tensor_utils.py
+index 1df8e4c..6a50c00 100644
+--- a/src/utils/tensor_utils.py
++++ b/src/utils/tensor_utils.py
+@@ -54,20 +54,20 @@ def extract_locations(
+         >>> data = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+         >>> locations = torch.tensor([[0, 1], [1, 2]])
+         >>> extract_locations(data, locations, num_dims=2)
+-        tensor([2, 6]) # (Index 0,1 gives 2 (First row, second column); Index 1,2 gives 6 (Second row, third column))
++        tensor([2, 6]) # 索引 0,1 得到 2（第一行第二列）；索引 1,2 得到 6（第二行第三列）。
+ 
+         >>> locations = torch.tensor([[0, 1], [2, 0]])
+         >>> extract_locations(data, locations, num_dims=1)
+         tensor([[1, 2, 3], [7, 8, 9]])
+-        # (num_dims = 1 implies we are extracting based on the first dimension only.
+-        # Thus, we get the first row (from [0,1] as 1 is ignored) and the third row
+-        # (from [2,0] as 0 is ignored) of the data tensor.
++        # num_dims = 1 表示只基于第一维提取。
++        # 因此会取 data 张量的第一行（[0,1] 中的 1 被忽略）和第三行
++        #（[2,0] 中的 0 被忽略）。
+     """
+ 
+-    # Separate the locations for each of the first D dimensions
++    # 分离前 D 个维度对应的位置索引。
+     index_tuple = locations_to_index_tuple(locations=locations, num_dims=num_dims)
+ 
+-    # Use indexing with a tuple of index tensors
++    # 使用索引张量元组做高级索引。
+     extracted_values = data[index_tuple]
+ 
+     return extracted_values
+@@ -95,9 +95,9 @@ def merge_list_of_keyed_tensors_to_single_tensor(
+     ]
+     output:
+     tensor([...,
+-            [21, 32, 124], # row 123
++            [21, 32, 124], # 第 123 行。
+             ...,
+-            [11, 22, 33], # row 456
++            [11, 22, 33], # 第 456 行。
+             ...
+             ])
+ 
+@@ -143,35 +143,35 @@ def deduplicate_rows_in_tensor(
+     data = torch.load(open_local_or_remote(file_path, mode="rb"))
+     assert len(data.size()) == 2, "Input data must be a 2D PyTorch tensor."
+ 
+-    # Use torch.unique to get unique rows and their inverse indices
++    # 使用 torch.unique 获取唯一行及其反向索引。
+     unique_rows, inverse_indices, counts = torch.unique(
+         data, dim=0, return_inverse=True, return_counts=True
+     )
+ 
+     output_indices = torch.zeros_like(inverse_indices)
+ 
+-    # Find indices where counts > 1 (meaning duplicates exist)
++    # 找出 counts > 1 的行，表示存在重复行。
+     duplicate_indices = torch.where(counts > 1)[0]
+ 
+     for i in range(len(duplicate_indices)):
+-        # Calculate number of collisions
++        # 计算当前唯一行对应的重复次数。
+         num_of_collisions = counts[duplicate_indices[i]]
+ 
+-        # Gather the indices where the collisions occur
++        # 收集发生重复的原始行索引。
+         indices_to_change = torch.where(inverse_indices == duplicate_indices[i])[0]
+ 
+-        # Create a range based on the number of collision, starting from 1
++        # 根据重复次数生成从 1 开始的编号。
+         range_to_add = torch.arange(1, num_of_collisions + 1)
+ 
+-        # Scatter to those specific indices
++        # 将重复编号写回到对应索引位置。
+         output_indices = output_indices.scatter(0, indices_to_change, range_to_add)
+ 
+-    # Concatenate the duplicate indicator column to the original data
++    # 将重复标记列拼接到原始数据后面。
+     result = torch.cat((data, output_indices.unsqueeze(1)), dim=1).long()
+     if return_tensor:
+         return result
+     else:
+-        # Save the result to a file
++        # 将结果保存回文件。
+         torch.save(result, file_path)
+         return None
+ 
+@@ -197,11 +197,11 @@ def transpose_tensor_from_file(
+         return None
+     data = torch.load(open_local_or_remote(file_path, mode="rb"))
+ 
+-    # Transpose the tensor
++    # 按指定维度转置张量。
+     result = data.transpose(dim1, dim2)
+     if return_tensor:
+         return result
+     else:
+-        # Save the result to a file
++        # 将结果保存回文件。
+         torch.save(result, file_path)
+         return None
+diff --git a/src/utils/utils.py b/src/utils/utils.py
+index a17e6c0..3f3cb8c 100755
+--- a/src/utils/utils.py
++++ b/src/utils/utils.py
+@@ -30,7 +30,7 @@ def print_warnings_for_missing_configs(cfg: DictConfig) -> None:
+             )
+             has_warnings = True
+     if has_warnings:
+-        sleep(3)  # wait for 3 seconds to let the user read the warning
++        sleep(3)  # 等待 3 秒，让用户有时间读完 warning。
+ 
+ 
+ def extras(cfg: DictConfig) -> None:
+@@ -43,17 +43,17 @@ def extras(cfg: DictConfig) -> None:
+ 
+     :param cfg: A DictConfig object containing the config tree.
+     """
+-    # return if no `extras` config
++    # 如果没有 `extras` 配置，直接返回。
+     if not cfg.get("extras"):
+         log.warning("Extras config not found! <cfg.extras=null>")
+         return
+ 
+-    # disable python warnings
++    # 按配置关闭 Python warning。
+     if cfg.extras.get("ignore_warnings"):
+         log.info("Disabling python warnings! <cfg.extras.ignore_warnings=True>")
+         warnings.filterwarnings("ignore")
+ 
+-    # prompt user to input tags from command line if none are provided in the config
++    # 如果配置中没有 tags，则从命令行提示用户输入。
+     if cfg.extras.get("enforce_tags"):
+         log.info("Enforcing tags! <cfg.extras.enforce_tags=True>")
+         rich_utils.enforce_tags(cfg, save_to_file=True)
+@@ -61,7 +61,7 @@ def extras(cfg: DictConfig) -> None:
+     if cfg.extras.get("print_config_warnings"):
+         print_warnings_for_missing_configs(cfg)
+ 
+-    # pretty print config tree using Rich library
++    # 使用 Rich 库美观地打印配置树。
+     if cfg.extras.get("print_config"):
+         log.info("Printing config tree with Rich! <cfg.extras.print_config=True>")
+         rich_utils.print_config_tree(cfg, resolve=True, save_to_file=True)
+@@ -201,15 +201,15 @@ def lightning_precision_to_dtype(precision: str) -> torch.dtype:
+     Raises:
+         ValueError: If an unsupported precision type is provided.
+     """
+-    # Mapping from Lightning precision identifiers to PyTorch dtypes
++    # Lightning 精度标识到 PyTorch dtype 的映射。
+     precision_map = {
+-        "32": torch.float32,  # Single precision (float32)
+-        "32-true": torch.float32,  # Also maps to float32, useful for clarity when specifying defaults
+-        "64": torch.float64,  # Double precision
+-        "16": torch.float16,  # Half precision
+-        "16-mixed": torch.float16,  # Mixed precision typically uses torch.float16
+-        "bf16": torch.bfloat16,  # BFloat16 precision
+-        "half": torch.float16,  # Alias for half precision
++        "32": torch.float32,  # 单精度 float32。
++        "32-true": torch.float32,  # 同样映射到 float32，便于在默认配置中显式表达。
++        "64": torch.float64,  # 双精度。
++        "16": torch.float16,  # 半精度。
++        "16-mixed": torch.float16,  # 混合精度通常使用 torch.float16。
++        "bf16": torch.bfloat16,  # BFloat16 精度。
++        "half": torch.float16,  # 半精度别名。
+     }
+ 
+     if precision in precision_map:
